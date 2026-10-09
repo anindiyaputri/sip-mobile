@@ -5,16 +5,18 @@ class ProfilePage extends StatelessWidget {
   const ProfilePage({
     super.key,
     required this.userProfile,
+    required this.onProfileUpdated,
     required this.onLogout,
   });
 
   final UserProfile userProfile;
+  final ValueChanged<UserProfile> onProfileUpdated;
   final VoidCallback onLogout;
 
   static const _primaryColor = Color(0xFF3157D5);
 
-  String _displayValue(String? value) =>
-      value == null || value.trim().isEmpty ? 'Belum tersedia' : value.trim();
+  String _displayValue(String? value, {String fallback = 'Belum tersedia'}) =>
+      value == null || value.trim().isEmpty ? fallback : value.trim();
 
   @override
   Widget build(BuildContext context) {
@@ -25,18 +27,44 @@ class ProfilePage extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
           children: [
             _ProfileHeader(
-              name: _displayValue(userProfile.name),
+              name: _displayValue(userProfile.name, fallback: 'Nama belum diisi'),
               email: _displayValue(userProfile.email),
-              role: _displayValue(userProfile.role),
+              role: userProfile.role,
             ),
             const SizedBox(height: 24),
             const _SectionTitle(title: 'Informasi Akun'),
             const SizedBox(height: 10),
             _AccountDetails(
-              name: _displayValue(userProfile.name),
+              name: _displayValue(userProfile.name, fallback: 'Nama belum diisi'),
               email: _displayValue(userProfile.email),
-              phone: _displayValue(userProfile.phone),
-              role: _displayValue(userProfile.role),
+              phone: _displayValue(
+                userProfile.phone,
+                fallback: 'Nomor telepon belum diisi',
+              ),
+              role: userProfile.role,
+            ),
+            const SizedBox(height: 24),
+            Card(
+              margin: EdgeInsets.zero,
+              color: const Color(0xFFE9EDFF),
+              elevation: 0,
+              child: const Padding(
+                padding: EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, color: _primaryColor, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Perubahan nama dan nomor telepon hanya tersimpan '
+                        'selama aplikasi berjalan dan belum disimpan ke server.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             const _SectionTitle(title: 'Pengaturan'),
@@ -46,12 +74,8 @@ class ProfilePage extends StatelessWidget {
                 _SettingsTile(
                   icon: Icons.edit_outlined,
                   title: 'Edit Profil',
-                  subtitle: 'Perbarui informasi profil',
-                  onTap: () => _showUnavailableDialog(
-                    context,
-                    'Edit Profil',
-                    'Fitur edit profil belum tersedia karena data profil belum terhubung.',
-                  ),
+                  subtitle: 'Ubah nama dan nomor telepon untuk sesi ini',
+                  onTap: () => _editProfile(context),
                 ),
                 const Divider(height: 1, indent: 56),
                 _SettingsTile(
@@ -98,6 +122,26 @@ class ProfilePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _editProfile(BuildContext context) async {
+    final updatedProfile = await showDialog<UserProfile>(
+      context: context,
+      builder: (_) => _EditProfileDialog(userProfile: userProfile),
+    );
+    if (updatedProfile == null) return;
+
+    onProfileUpdated(updatedProfile);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Profil diperbarui untuk sesi ini; perubahan belum tersimpan permanen.',
+          ),
+        ),
+      );
   }
 
   Future<void> _showUnavailableDialog(
@@ -175,7 +219,7 @@ class _ProfileHeader extends StatelessWidget {
 
   final String name;
   final String email;
-  final String role;
+  final String? role;
 
   @override
   Widget build(BuildContext context) {
@@ -216,22 +260,24 @@ class _ProfileHeader extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(color: Color(0xFFE9EDFF), fontSize: 14),
           ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              role,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+          if (role != null && role!.trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                role!.trim(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -249,7 +295,7 @@ class _AccountDetails extends StatelessWidget {
   final String name;
   final String email;
   final String phone;
-  final String role;
+  final String? role;
 
   @override
   Widget build(BuildContext context) {
@@ -268,11 +314,120 @@ class _AccountDetails extends StatelessWidget {
           label: 'Nomor telepon',
           value: phone,
         ),
-        const Divider(height: 1, indent: 56),
-        _DetailRow(
-          icon: Icons.admin_panel_settings_outlined,
-          label: 'Peran pengguna',
-          value: role,
+        if (role != null && role!.trim().isNotEmpty) ...[
+          const Divider(height: 1, indent: 56),
+          _DetailRow(
+            icon: Icons.admin_panel_settings_outlined,
+            label: 'Peran pengguna',
+            value: role!.trim(),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _EditProfileDialog extends StatefulWidget {
+  const _EditProfileDialog({required this.userProfile});
+
+  final UserProfile userProfile;
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(
+      text: widget.userProfile.name ?? '',
+    );
+    _phoneController = TextEditingController(
+      text: widget.userProfile.phone ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Profil'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                key: const Key('profile_name_field'),
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Nama lengkap',
+                  prefixIcon: Icon(Icons.badge_outlined),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Nama lengkap wajib diisi';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                key: const Key('profile_phone_field'),
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Nomor telepon (opsional)',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+                validator: (value) {
+                  final phone = value?.trim() ?? '';
+                  if (phone.isNotEmpty &&
+                      !RegExp(r'^\+?[0-9 -]{7,20}$').hasMatch(phone)) {
+                    return 'Masukkan nomor telepon yang valid';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Email dan peran tidak dapat diubah di sini.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF687386)),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (!_formKey.currentState!.validate()) return;
+            Navigator.of(context).pop(
+              widget.userProfile.withEditableDetails(
+                name: _nameController.text,
+                phone: _phoneController.text,
+              ),
+            );
+          },
+          child: const Text('Simpan'),
         ),
       ],
     );

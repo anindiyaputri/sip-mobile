@@ -89,8 +89,10 @@ void main() {
 
     await tester.tap(find.text('Profil').last);
     await tester.pumpAndSettle();
-    expect(find.text('Belum tersedia'), findsWidgets);
+    expect(find.text('Nama belum diisi'), findsNWidgets(2));
+    expect(find.text('Nomor telepon belum diisi'), findsOneWidget);
     expect(find.text('petugas@sip.id'), findsNWidgets(2));
+    expect(find.text('Peran pengguna'), findsNothing);
     await tester.scrollUntilVisible(find.text('Edit Profil'), 240);
     expect(find.text('Edit Profil'), findsOneWidget);
     expect(find.text('Pengaturan Akun'), findsOneWidget);
@@ -155,4 +157,53 @@ void main() {
     expect(find.text('kedua@sip.id'), findsNWidgets(2));
     expect(find.text('pertama@sip.id'), findsNothing);
   });
+
+  testWidgets(
+    'edit profile updates session details without changing email or role',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(const SipMobileApp());
+      await tester.enterText(
+        find.byType(TextFormField).at(0),
+        'profile@sip.id',
+      );
+      await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+      await tester.tap(find.text('Masuk'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Profil').last);
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(find.text('Edit Profil'), 240);
+      await tester.tap(find.text('Edit Profil'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Simpan'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nama lengkap wajib diisi'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('profile_name_field')),
+        'Dewi Putri',
+      );
+      await tester.enterText(
+        find.byKey(const Key('profile_phone_field')),
+        '+628123456789',
+      );
+      await tester.tap(find.text('Simpan'));
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(ListView), const Offset(0, 1000));
+      await tester.pumpAndSettle();
+      expect(find.text('Dewi Putri'), findsWidgets);
+      await tester.scrollUntilVisible(find.text('+628123456789'), 240);
+      expect(find.text('+628123456789'), findsOneWidget);
+      expect(find.text('profile@sip.id'), findsWidgets);
+      expect(find.text('Peran pengguna'), findsNothing);
+      expect(
+        find.text(
+          'Profil diperbarui untuk sesi ini; perubahan belum tersimpan permanen.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }

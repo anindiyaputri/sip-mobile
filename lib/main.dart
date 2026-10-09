@@ -231,6 +231,7 @@ class Loan {
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
   String _bookSearch = '';
+  late UserProfile _userProfile;
   int _nextBookId = 4;
   int _nextMemberId = 3;
   int _nextLoanId = 3;
@@ -294,6 +295,12 @@ class _DashboardPageState extends State<DashboardPage> {
       dueAt: DateTime.now().add(const Duration(days: 6)),
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _userProfile = widget.userProfile;
+  }
 
   int _activeLoansForBook(int bookId) => _loans
       .where((loan) => loan.bookId == bookId && loan.returnedAt == null)
@@ -379,7 +386,10 @@ class _DashboardPageState extends State<DashboardPage> {
         return LoansPage(loans: _loans, onAdd: _addLoan, onReturn: _returnLoan);
       case 4:
         return ProfilePage(
-          userProfile: widget.userProfile,
+          userProfile: _userProfile,
+          onProfileUpdated: (profile) {
+            setState(() => _userProfile = profile);
+          },
           onLogout: () {
             Navigator.of(context).pushAndRemoveUntil<void>(
               MaterialPageRoute<void>(builder: (_) => const LoginPage()),
