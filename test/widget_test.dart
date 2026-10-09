@@ -26,6 +26,16 @@ void main() {
 
     expect(find.text('Sistem Informasi Perpustakaan'), findsOneWidget);
     expect(find.text('Ringkasan'), findsOneWidget);
+    expect(find.text('Menu Utama'), findsNothing);
+    expect(find.text('Data Buku'), findsNothing);
+    expect(find.text('Data Anggota'), findsNothing);
+    expect(find.text('Peminjaman'), findsNothing);
+    expect(find.text('Pengembalian'), findsNothing);
+    expect(find.text('Buku Sedang Dipinjam'), findsOneWidget);
+    expect(find.text('Beranda'), findsOneWidget);
+    expect(find.text('Buku'), findsOneWidget);
+    expect(find.text('Anggota'), findsWidgets);
+    expect(find.text('Transaksi'), findsOneWidget);
   });
 
   testWidgets('menus add books and process loan returns', (
@@ -59,6 +69,8 @@ void main() {
     expect(find.text('Riwayat Pengembalian (1)'), findsOneWidget);
     expect(find.text('Sedang Dipinjam (1)'), findsOneWidget);
 
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Pinjam Buku'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Simpan'));

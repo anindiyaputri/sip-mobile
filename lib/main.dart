@@ -684,58 +684,6 @@ class DashboardContent extends StatelessWidget {
 
             const SizedBox(height: 26),
 
-            // MENU UTAMA
-            const Text(
-              'Menu Utama',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-
-            const SizedBox(height: 14),
-
-            Row(
-              children: [
-                Expanded(
-                  child: MenuCard(
-                    icon: Icons.menu_book,
-                    title: 'Data Buku',
-                    onTap: () => onSelectTab(1),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: MenuCard(
-                    icon: Icons.people,
-                    title: 'Data Anggota',
-                    onTap: () => onSelectTab(2),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            Row(
-              children: [
-                Expanded(
-                  child: MenuCard(
-                    icon: Icons.arrow_circle_up,
-                    title: 'Peminjaman',
-                    onTap: () => onSelectTab(3),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: MenuCard(
-                    icon: Icons.arrow_circle_down,
-                    title: 'Pengembalian',
-                    onTap: () => onSelectTab(3),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 28),
-
             // BUKU SEDANG DIPINJAM
             Row(
               children: [
@@ -1209,138 +1157,197 @@ String _formatDate(DateTime date) =>
     '${date.month.toString().padLeft(2, '0')}/${date.year}';
 
 Future<Book?> _showBookForm(BuildContext context, {Book? existing}) async {
-  final formKey = GlobalKey<FormState>();
-  final title = TextEditingController(text: existing?.title ?? '');
-  final author = TextEditingController(text: existing?.author ?? '');
-  final category = TextEditingController(text: existing?.category ?? '');
-  final copies = TextEditingController(
-    text: existing?.copies.toString() ?? '1',
+  return showDialog<Book>(
+    context: context,
+    builder: (_) => _BookFormDialog(existing: existing),
   );
-  try {
-    return await showDialog<Book>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(existing == null ? 'Tambah Buku' : 'Edit Buku'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _formField(title, 'Judul buku'),
-                _formField(author, 'Pengarang'),
-                _formField(category, 'Kategori'),
-                _formField(
-                  copies,
-                  'Jumlah eksemplar',
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    final count = int.tryParse(value ?? '');
-                    if (count == null || count < 1) {
-                      return 'Masukkan jumlah minimal 1';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.pop(
-                dialogContext,
-                Book(
-                  id: existing?.id ?? 0,
-                  title: title.text.trim(),
-                  author: author.text.trim(),
-                  category: category.text.trim(),
-                  copies: int.parse(copies.text.trim()),
-                ),
-              );
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
-  } finally {
-    title.dispose();
-    author.dispose();
-    category.dispose();
-    copies.dispose();
-  }
 }
 
 Future<Member?> _showMemberForm(
   BuildContext context, {
   Member? existing,
 }) async {
+  return showDialog<Member>(
+    context: context,
+    builder: (_) => _MemberFormDialog(existing: existing),
+  );
+}
+
+class _BookFormDialog extends StatefulWidget {
+  const _BookFormDialog({this.existing});
+
+  final Book? existing;
+
+  @override
+  State<_BookFormDialog> createState() => _BookFormDialogState();
+}
+
+class _BookFormDialogState extends State<_BookFormDialog> {
   final formKey = GlobalKey<FormState>();
-  final name = TextEditingController(text: existing?.name ?? '');
-  final phone = TextEditingController(text: existing?.phone ?? '');
-  final email = TextEditingController(text: existing?.email ?? '');
-  try {
-    return await showDialog<Member>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(existing == null ? 'Tambah Anggota' : 'Edit Anggota'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _formField(name, 'Nama anggota'),
-                _formField(phone, 'Nomor telepon'),
-                _formField(
-                  email,
-                  'Email',
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (!(value ?? '').contains('@')) {
-                      return 'Masukkan email yang valid';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
+  late final TextEditingController titleController;
+  late final TextEditingController authorController;
+  late final TextEditingController categoryController;
+  late final TextEditingController copiesController;
+
+  @override
+  void initState() {
+    super.initState();
+    titleController = TextEditingController(text: widget.existing?.title ?? '');
+    authorController = TextEditingController(
+      text: widget.existing?.author ?? '',
+    );
+    categoryController = TextEditingController(
+      text: widget.existing?.category ?? '',
+    );
+    copiesController = TextEditingController(
+      text: widget.existing?.copies.toString() ?? '1',
+    );
+  }
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    authorController.dispose();
+    categoryController.dispose();
+    copiesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.existing == null ? 'Tambah Buku' : 'Edit Buku'),
+      content: Form(
+        key: formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _formField(titleController, 'Judul buku'),
+              _formField(authorController, 'Pengarang'),
+              _formField(categoryController, 'Kategori'),
+              _formField(
+                copiesController,
+                'Jumlah eksemplar',
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  final count = int.tryParse(value ?? '');
+                  if (count == null || count < 1) {
+                    return 'Masukkan jumlah minimal 1';
+                  }
+                  return null;
+                },
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              Navigator.pop(
-                dialogContext,
-                Member(
-                  id: existing?.id ?? 0,
-                  name: name.text.trim(),
-                  phone: phone.text.trim(),
-                  email: email.text.trim(),
-                ),
-              );
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (!formKey.currentState!.validate()) return;
+            Navigator.pop(
+              context,
+              Book(
+                id: widget.existing?.id ?? 0,
+                title: titleController.text.trim(),
+                author: authorController.text.trim(),
+                category: categoryController.text.trim(),
+                copies: int.parse(copiesController.text.trim()),
+              ),
+            );
+          },
+          child: const Text('Simpan'),
+        ),
+      ],
     );
-  } finally {
-    name.dispose();
-    phone.dispose();
-    email.dispose();
+  }
+}
+
+class _MemberFormDialog extends StatefulWidget {
+  const _MemberFormDialog({this.existing});
+
+  final Member? existing;
+
+  @override
+  State<_MemberFormDialog> createState() => _MemberFormDialogState();
+}
+
+class _MemberFormDialogState extends State<_MemberFormDialog> {
+  final formKey = GlobalKey<FormState>();
+  late final TextEditingController nameController;
+  late final TextEditingController phoneController;
+  late final TextEditingController emailController;
+
+  @override
+  void initState() {
+    super.initState();
+    nameController = TextEditingController(text: widget.existing?.name ?? '');
+    phoneController = TextEditingController(text: widget.existing?.phone ?? '');
+    emailController = TextEditingController(text: widget.existing?.email ?? '');
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.existing == null ? 'Tambah Anggota' : 'Edit Anggota'),
+      content: Form(
+        key: formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _formField(nameController, 'Nama anggota'),
+              _formField(phoneController, 'Nomor telepon'),
+              _formField(
+                emailController,
+                'Email',
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (!(value ?? '').contains('@')) {
+                    return 'Masukkan email yang valid';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (!formKey.currentState!.validate()) return;
+            Navigator.pop(
+              context,
+              Member(
+                id: widget.existing?.id ?? 0,
+                name: nameController.text.trim(),
+                phone: phoneController.text.trim(),
+                email: emailController.text.trim(),
+              ),
+            );
+          },
+          child: const Text('Simpan'),
+        ),
+      ],
+    );
   }
 }
 
