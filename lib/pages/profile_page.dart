@@ -10,7 +10,7 @@ class ProfilePage extends StatelessWidget {
   });
 
   final UserProfile userProfile;
-  final ValueChanged<UserProfile> onProfileUpdated;
+  final Future<bool> Function(UserProfile profile) onProfileUpdated;
   final VoidCallback onLogout;
 
   static const _primaryColor = Color(0xFF3157D5);
@@ -27,7 +27,10 @@ class ProfilePage extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
           children: [
             _ProfileHeader(
-              name: _displayValue(userProfile.name, fallback: 'Nama belum diisi'),
+              name: _displayValue(
+                userProfile.name,
+                fallback: 'Nama belum diisi',
+              ),
               email: _displayValue(userProfile.email),
               role: userProfile.role,
             ),
@@ -35,7 +38,10 @@ class ProfilePage extends StatelessWidget {
             const _SectionTitle(title: 'Informasi Akun'),
             const SizedBox(height: 10),
             _AccountDetails(
-              name: _displayValue(userProfile.name, fallback: 'Nama belum diisi'),
+              name: _displayValue(
+                userProfile.name,
+                fallback: 'Nama belum diisi',
+              ),
               email: _displayValue(userProfile.email),
               phone: _displayValue(
                 userProfile.phone,
@@ -43,7 +49,19 @@ class ProfilePage extends StatelessWidget {
               ),
               role: userProfile.role,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () => _editProfile(context),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Edit Profil'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
             Card(
               margin: EdgeInsets.zero,
               color: const Color(0xFFE9EDFF),
@@ -58,7 +76,8 @@ class ProfilePage extends StatelessWidget {
                     Expanded(
                       child: Text(
                         'Perubahan nama dan nomor telepon hanya tersimpan '
-                        'selama aplikasi berjalan dan belum disimpan ke server.',
+                        'secara lokal di perangkat ini dan belum disinkronkan '
+                        'ke server.',
                         style: TextStyle(fontSize: 12),
                       ),
                     ),
@@ -71,13 +90,6 @@ class ProfilePage extends StatelessWidget {
             const SizedBox(height: 10),
             _SettingsCard(
               children: [
-                _SettingsTile(
-                  icon: Icons.edit_outlined,
-                  title: 'Edit Profil',
-                  subtitle: 'Ubah nama dan nomor telepon untuk sesi ini',
-                  onTap: () => _editProfile(context),
-                ),
-                const Divider(height: 1, indent: 56),
                 _SettingsTile(
                   icon: Icons.manage_accounts_outlined,
                   title: 'Pengaturan Akun',
@@ -106,6 +118,7 @@ class ProfilePage extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             OutlinedButton.icon(
+              key: const Key('profile_logout_button'),
               onPressed: () => _confirmLogout(context),
               icon: const Icon(Icons.logout),
               label: const Text('Keluar'),
@@ -131,14 +144,21 @@ class ProfilePage extends StatelessWidget {
     );
     if (updatedProfile == null) return;
 
-    onProfileUpdated(updatedProfile);
+    var saved = false;
+    try {
+      saved = await onProfileUpdated(updatedProfile);
+    } on Exception {
+      saved = false;
+    }
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Profil diperbarui untuk sesi ini; perubahan belum tersimpan permanen.',
+            saved
+                ? 'Profil disimpan di perangkat ini; belum disinkronkan ke server.'
+                : 'Profil gagal disimpan. Silakan coba lagi.',
           ),
         ),
       );

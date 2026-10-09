@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/models/user_profile.dart';
 import 'package:flutter_application_1/pages/profile_page.dart';
+import 'package:flutter_application_1/services/user_profile_local_store.dart';
 
 void main() {
   runApp(const SipMobileApp());
@@ -232,6 +233,9 @@ class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
   String _bookSearch = '';
   late UserProfile _userProfile;
+  final _profileStore = UserProfileLocalStore();
+  bool _isProfileLoaded = false;
+  String? _profileLoadError;
   int _nextBookId = 4;
   int _nextMemberId = 3;
   int _nextLoanId = 3;
@@ -300,6 +304,38 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _userProfile = widget.userProfile;
+    _loadSavedProfile();
+  }
+
+  Future<void> _loadSavedProfile() async {
+    try {
+      final savedProfile = await _profileStore.load(widget.userProfile.email);
+      if (!mounted) return;
+      setState(() {
+        _userProfile = UserProfile(
+          id: widget.userProfile.id,
+          email: widget.userProfile.email,
+          name: savedProfile.name ?? widget.userProfile.name,
+          phone: savedProfile.phone ?? widget.userProfile.phone,
+          role: widget.userProfile.role,
+        );
+        _isProfileLoaded = true;
+        _profileLoadError = null;
+      });
+    } on Exception catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isProfileLoaded = false;
+        _profileLoadError = error.toString();
+      });
+    }
+  }
+
+  Future<bool> _saveProfile(UserProfile profile) async {
+    final saved = await _profileStore.save(profile);
+    if (!saved || !mounted) return saved;
+    setState(() => _userProfile = profile);
+    return true;
   }
 
   int _activeLoansForBook(int bookId) => _loans
@@ -385,11 +421,41 @@ class _DashboardPageState extends State<DashboardPage> {
       case 3:
         return LoansPage(loans: _loans, onAdd: _addLoan, onReturn: _returnLoan);
       case 4:
+        if (!_isProfileLoaded) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Profil')),
+            body: Center(
+              child: _profileLoadError == null
+                  ? const CircularProgressIndicator()
+                  : Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Data profil lokal gagal dimuat.',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _profileLoadError!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton(
+                            onPressed: _loadSavedProfile,
+                            child: const Text('Coba lagi'),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+          );
+        }
         return ProfilePage(
           userProfile: _userProfile,
-          onProfileUpdated: (profile) {
-            setState(() => _userProfile = profile);
-          },
+          onProfileUpdated: _saveProfile,
           onLogout: () {
             Navigator.of(context).pushAndRemoveUntil<void>(
               MaterialPageRoute<void>(builder: (_) => const LoginPage()),

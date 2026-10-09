@@ -7,10 +7,16 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_application_1/main.dart';
+import 'package:flutter_application_1/services/user_profile_local_store.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('login opens the dashboard after valid input', (
     WidgetTester tester,
   ) async {
@@ -100,17 +106,29 @@ void main() {
     await tester.scrollUntilVisible(find.text('Versi Aplikasi'), 240);
     expect(find.text('1.0.0+1'), findsOneWidget);
 
-    await tester.scrollUntilVisible(find.byType(OutlinedButton), 240);
-    await tester.tap(find.text('Keluar'));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('profile_logout_button')),
+      240,
+    );
+    await tester.tap(find.byKey(const Key('profile_logout_button')));
     await tester.pumpAndSettle();
     expect(find.text('Keluar dari akun?'), findsOneWidget);
     await tester.tap(find.text('Batal'));
     await tester.pumpAndSettle();
     expect(find.text('Profil'), findsWidgets);
 
-    await tester.tap(find.text('Keluar'));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('profile_logout_button')),
+      240,
+    );
+    await tester.tap(find.byKey(const Key('profile_logout_button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Keluar').last);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Keluar'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Selamat datang'), findsOneWidget);
   });
@@ -130,10 +148,19 @@ void main() {
     Future<void> logout() async {
       await tester.tap(find.text('Profil').last);
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.byType(OutlinedButton), 240);
-      await tester.tap(find.text('Keluar'));
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('profile_logout_button')),
+        240,
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Keluar').last);
+      await tester.tap(find.byKey(const Key('profile_logout_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Keluar'),
+        ),
+      );
       await tester.pumpAndSettle();
     }
 
@@ -200,10 +227,406 @@ void main() {
       expect(find.text('Peran pengguna'), findsNothing);
       expect(
         find.text(
-          'Profil diperbarui untuk sesi ini; perubahan belum tersimpan permanen.',
+          'Profil disimpan di perangkat ini; belum disinkronkan ke server.',
         ),
         findsOneWidget,
       );
+
+      final savedProfile = await UserProfileLocalStore().load('profile@sip.id');
+      expect(savedProfile.name, 'Dewi Putri');
+      expect(savedProfile.phone, '+628123456789');
+      expect(savedProfile.email, 'profile@sip.id');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     },
   );
 }
