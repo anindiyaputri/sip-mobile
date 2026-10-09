@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import 'package:flutter_application_1/models/user_profile.dart';
+import 'package:flutter_application_1/pages/account_settings_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({
@@ -91,14 +93,11 @@ class ProfilePage extends StatelessWidget {
             _SettingsCard(
               children: [
                 _SettingsTile(
+                  key: const Key('profile_account_settings'),
                   icon: Icons.manage_accounts_outlined,
                   title: 'Pengaturan Akun',
-                  subtitle: 'Kelola preferensi akun',
-                  onTap: () => _showUnavailableDialog(
-                    context,
-                    'Pengaturan Akun',
-                    'Pengaturan akun belum tersedia pada aplikasi ini.',
-                  ),
+                  subtitle: 'Lihat dan perbarui informasi akun',
+                  onTap: () => _openAccountSettings(context),
                 ),
                 const Divider(height: 1, indent: 56),
                 _SettingsTile(
@@ -137,6 +136,17 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  Future<void> _openAccountSettings(BuildContext context) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => AccountSettingsPage(
+          userProfile: userProfile,
+          onProfileUpdated: onProfileUpdated,
+        ),
+      ),
+    );
+  }
+
   Future<void> _editProfile(BuildContext context) async {
     final updatedProfile = await showDialog<UserProfile>(
       context: context,
@@ -162,26 +172,6 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
       );
-  }
-
-  Future<void> _showUnavailableDialog(
-    BuildContext context,
-    String title,
-    String message,
-  ) {
-    return showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Mengerti'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showAboutDialog(BuildContext context) {
@@ -490,6 +480,7 @@ class _SettingsCard extends StatelessWidget {
 
 class _SettingsTile extends StatelessWidget {
   const _SettingsTile({
+    super.key,
     required this.icon,
     required this.title,
     required this.subtitle,

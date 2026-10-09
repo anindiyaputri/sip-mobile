@@ -236,397 +236,88 @@ void main() {
       expect(savedProfile.name, 'Dewi Putri');
       expect(savedProfile.phone, '+628123456789');
       expect(savedProfile.email, 'profile@sip.id');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    },
+  );
+
+  testWidgets(
+    'account settings edit profile and return updates the profile page',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(const SipMobileApp());
+      await tester.enterText(find.byType(TextFormField).at(0), 'akun@sip.id');
+      await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+      await tester.tap(find.text('Masuk'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Profil').last);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('profile_account_settings')),
+        240,
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('profile_account_settings')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('profile_account_settings')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Email Login'), findsOneWidget);
+      expect(find.text('akun@sip.id'), findsOneWidget);
+      expect(
+        find.text('Email tidak dapat diubah melalui pengaturan ini.'),
+        findsOneWidget,
+      );
+      expect(find.text('Pengaturan Akun'), findsOneWidget);
+      expect(find.byType(TextFormField), findsNWidgets(2));
+
+      await tester.enterText(
+        find.byKey(const Key('account_settings_name_field')),
+        'Nama Sementara',
+      );
+      await tester.tap(find.text('Batal'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.byKey(const Key('account_settings_name_field')),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+
+      await tester.tap(find.text('Simpan'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nama lengkap wajib diisi'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('account_settings_name_field')),
+        'Rani Aulia',
+      );
+      await tester.enterText(
+        find.byKey(const Key('account_settings_phone_field')),
+        '081234567890',
+      );
+      await tester.tap(find.text('Simpan'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Pengaturan akun disimpan di perangkat ini.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byTooltip('Kembali ke Profil'));
+      await tester.pumpAndSettle();
+      expect(find.text('rani'), findsNothing);
+      await tester.drag(find.byType(ListView).first, const Offset(0, 900));
+      await tester.pumpAndSettle();
+      expect(find.text('Rani Aulia'), findsWidgets);
+      expect(find.text('akun@sip.id'), findsWidgets);
+      await tester.scrollUntilVisible(find.text('081234567890'), 240);
+      expect(find.text('081234567890'), findsOneWidget);
+
+      final savedProfile = await UserProfileLocalStore().load('akun@sip.id');
+      expect(savedProfile.name, 'Rani Aulia');
+      expect(savedProfile.phone, '081234567890');
     },
   );
 }
