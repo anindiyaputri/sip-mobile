@@ -60,109 +60,240 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isKeyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3157D5),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Icon(
-                        Icons.local_library,
-                        color: Colors.white,
-                        size: 34,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    const Text(
-                      'Selamat datang',
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Masuk ke SIP Mobile untuk mengelola perpustakaan.',
-                      style: TextStyle(color: Colors.black54, fontSize: 15),
-                    ),
-                    const SizedBox(height: 32),
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        hintText: 'nama@email.com',
-                        prefixIcon: Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        final email = value?.trim() ?? '';
-                        if (email.isEmpty || !email.contains('@')) {
-                          return 'Masukkan alamat email yang valid';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _signIn(),
-                      decoration: InputDecoration(
-                        labelText: 'Kata sandi',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          tooltip: _obscurePassword
-                              ? 'Tampilkan kata sandi'
-                              : 'Sembunyikan kata sandi',
-                          onPressed: () => setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          }),
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!isKeyboardVisible) ...[
+                    Row(
+                      children: [
+                        Container(
+                          width: 54,
+                          height: 54,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3157D5),
+                            borderRadius: BorderRadius.circular(17),
+                          ),
+                          child: const Icon(
+                            Icons.menu_book_rounded,
+                            color: Colors.white,
+                            size: 29,
                           ),
                         ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Kata sandi wajib diisi';
-                        }
-                        return null;
-                      },
+                        const SizedBox(width: 14),
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'SIP Mobile',
+                              style: TextStyle(
+                                color: Color(0xFF17233D),
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            SizedBox(height: 3),
+                            Text(
+                              'Sistem Informasi Perpustakaan',
+                              style: TextStyle(
+                                color: Color(0xFF77839A),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _signIn,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52),
+                    const SizedBox(height: 38),
+                  ] else
+                    const SizedBox(height: 8),
+                  Text(
+                    'Selamat Datang Kembali',
+                    style: TextStyle(
+                      color: const Color(0xFF17233D),
+                      fontSize: isKeyboardVisible ? 24 : 27,
+                      height: 1.2,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Masuk untuk mengelola perpustakaan Anda',
+                    style: TextStyle(
+                      color: Color(0xFF77839A),
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                  SizedBox(height: isKeyboardVisible ? 14 : 25),
+                  Container(
+                    padding: EdgeInsets.all(isKeyboardVisible ? 16 : 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE8EDF5)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0A17233D),
+                          blurRadius: 24,
+                          offset: Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            decoration: _loginInputDecoration(
+                              label: 'Email',
+                              hint: 'nama@email.com',
+                              icon: Icons.email_outlined,
+                            ),
+                            validator: (value) {
+                              final email = value?.trim() ?? '';
+                              if (email.isEmpty || !email.contains('@')) {
+                                return 'Masukkan alamat email yang valid';
+                              }
+                              return null;
+                            },
+                          ),
+                          SizedBox(height: isKeyboardVisible ? 12 : 18),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _signIn(),
+                            decoration: _loginInputDecoration(
+                              label: 'Kata Sandi',
+                              icon: Icons.lock_outline_rounded,
+                              suffixIcon: IconButton(
+                                tooltip: _obscurePassword
+                                    ? 'Tampilkan kata sandi'
+                                    : 'Sembunyikan kata sandi',
+                                onPressed: () => setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                }),
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Kata sandi wajib diisi';
+                              }
+                              return null;
+                            },
+                          ),
+                          SizedBox(height: isKeyboardVisible ? 16 : 24),
+                          FilledButton(
+                            onPressed: _signIn,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF3157D5),
+                              foregroundColor: Colors.white,
+                              minimumSize: Size.fromHeight(
+                                isKeyboardVisible ? 50 : 54,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            child: const Text('Masuk'),
+                          ),
+                        ],
                       ),
-                      child: const Text('Masuk'),
+                    ),
+                  ),
+                  if (!isKeyboardVisible) ...[
+                    const SizedBox(height: 20),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.local_library_outlined,
+                          color: Color(0xFF8A96AA),
+                          size: 16,
+                        ),
+                        SizedBox(width: 7),
+                        Flexible(
+                          child: Text(
+                            'Kelola perpustakaan dengan lebih mudah',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(0xFF8A96AA),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
+                ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  InputDecoration _loginInputDecoration({
+    required String label,
+    required IconData icon,
+    String? hint,
+    Widget? suffixIcon,
+  }) {
+    const borderColor = Color(0xFFE1E7F0);
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon, color: const Color(0xFF64748B), size: 21),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: const Color(0xFFFAFBFE),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF3157D5), width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFBA1A1A)),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFBA1A1A), width: 1.5),
       ),
     );
   }

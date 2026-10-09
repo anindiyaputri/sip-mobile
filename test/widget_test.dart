@@ -22,7 +22,13 @@ void main() {
   ) async {
     await tester.pumpWidget(const SipMobileApp());
 
-    expect(find.text('Selamat datang'), findsOneWidget);
+    expect(find.text('Selamat Datang Kembali'), findsOneWidget);
+    expect(find.text('SIP Mobile'), findsOneWidget);
+    expect(find.text('Sistem Informasi Perpustakaan'), findsOneWidget);
+    expect(
+      find.text('Masuk untuk mengelola perpustakaan Anda'),
+      findsOneWidget,
+    );
     expect(find.text('Masuk'), findsOneWidget);
 
     await tester.enterText(find.byType(TextFormField).at(0), 'admin@email.com');
@@ -130,7 +136,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Selamat datang'), findsOneWidget);
+    expect(find.text('Selamat Datang Kembali'), findsOneWidget);
   });
 
   testWidgets('profile email follows each locally validated login', (
@@ -176,7 +182,7 @@ void main() {
     expect(find.text('pertama@sip.id'), findsNWidgets(2));
 
     await logout();
-    expect(find.text('Selamat datang'), findsOneWidget);
+    expect(find.text('Selamat Datang Kembali'), findsOneWidget);
 
     await loginWith('kedua@sip.id');
     await tester.tap(find.text('Profil').last);
