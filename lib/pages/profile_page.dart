@@ -1,0 +1,368 @@
+import 'package:flutter/material.dart';
+
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({
+    super.key,
+    required this.userEmail,
+    required this.onLogout,
+  });
+
+  final String userEmail;
+  final VoidCallback onLogout;
+
+  static const _primaryColor = Color(0xFF3157D5);
+
+  String get _displayEmail =>
+      userEmail.isEmpty ? 'Email belum tersedia' : userEmail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Profil')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+          children: [
+            _ProfileHeader(email: _displayEmail),
+            const SizedBox(height: 24),
+            const _SectionTitle(title: 'Informasi Akun'),
+            const SizedBox(height: 10),
+            _AccountDetails(email: _displayEmail),
+            const SizedBox(height: 24),
+            const _SectionTitle(title: 'Pengaturan'),
+            const SizedBox(height: 10),
+            _SettingsCard(
+              children: [
+                _SettingsTile(
+                  icon: Icons.edit_outlined,
+                  title: 'Edit Profil',
+                  subtitle: 'Perbarui informasi profil',
+                  onTap: () => _showUnavailableDialog(
+                    context,
+                    'Edit Profil',
+                    'Fitur edit profil belum tersedia karena data profil belum terhubung.',
+                  ),
+                ),
+                const Divider(height: 1, indent: 56),
+                _SettingsTile(
+                  icon: Icons.manage_accounts_outlined,
+                  title: 'Pengaturan Akun',
+                  subtitle: 'Kelola preferensi akun',
+                  onTap: () => _showUnavailableDialog(
+                    context,
+                    'Pengaturan Akun',
+                    'Pengaturan akun belum tersedia pada aplikasi ini.',
+                  ),
+                ),
+                const Divider(height: 1, indent: 56),
+                _SettingsTile(
+                  icon: Icons.info_outline,
+                  title: 'Tentang SIP Mobile',
+                  subtitle: 'Informasi aplikasi',
+                  onTap: () => _showAboutDialog(context),
+                ),
+                const Divider(height: 1, indent: 56),
+                const _SettingsTile(
+                  icon: Icons.verified_outlined,
+                  title: 'Versi Aplikasi',
+                  subtitle: '1.0.0+1',
+                  showChevron: false,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: () => _confirmLogout(context),
+              icon: const Icon(Icons.logout),
+              label: const Text('Keluar'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFB3261E),
+                minimumSize: const Size.fromHeight(52),
+                side: const BorderSide(color: Color(0xFFE6B8B5)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showUnavailableDialog(
+    BuildContext context,
+    String title,
+    String message,
+  ) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Mengerti'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'SIP Mobile',
+      applicationVersion: '1.0.0+1',
+      applicationIcon: const Icon(
+        Icons.local_library,
+        color: _primaryColor,
+        size: 36,
+      ),
+      children: const [
+        Text('Aplikasi mobile untuk membantu pengelolaan perpustakaan.'),
+      ],
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.logout, color: Color(0xFFB3261E)),
+        title: const Text('Keluar dari akun?'),
+        content: const Text(
+          'Anda akan kembali ke halaman masuk. Proses ini tidak menjalankan '
+          'operasi penghapusan atau perubahan database.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFB3261E),
+            ),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) onLogout();
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.email});
+
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF3157D5), Color(0xFF5878E8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        children: [
+          const CircleAvatar(
+            radius: 42,
+            backgroundColor: Colors.white,
+            child: Icon(
+              Icons.person_outline,
+              size: 46,
+              color: Color(0xFF3157D5),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Nama belum tersedia',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            email,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFFE9EDFF), fontSize: 14),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'Peran belum tersedia',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountDetails extends StatelessWidget {
+  const _AccountDetails({required this.email});
+
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsCard(
+      children: [
+        const _DetailRow(
+          icon: Icons.badge_outlined,
+          label: 'Nama lengkap',
+          value: 'Belum tersedia',
+        ),
+        const Divider(height: 1, indent: 56),
+        _DetailRow(icon: Icons.email_outlined, label: 'Email', value: email),
+        const Divider(height: 1, indent: 56),
+        const _DetailRow(
+          icon: Icons.phone_outlined,
+          label: 'Nomor telepon',
+          value: 'Belum tersedia',
+        ),
+        const Divider(height: 1, indent: 56),
+        const _DetailRow(
+          icon: Icons.admin_panel_settings_outlined,
+          label: 'Peran pengguna',
+          value: 'Belum tersedia',
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+    );
+  }
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: Color(0xFFE9ECF2)),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: children),
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+    this.showChevron = true,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final bool showChevron;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Icon(icon, color: const Color(0xFF3157D5)),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: Color(0xFF687386), fontSize: 12),
+      ),
+      trailing: showChevron
+          ? const Icon(Icons.chevron_right, color: Color(0xFF687386))
+          : null,
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFF3157D5), size: 21),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFF687386),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

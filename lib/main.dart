@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/pages/profile_page.dart';
 
 void main() {
   runApp(const SipMobileApp());
@@ -47,7 +48,9 @@ class _LoginPageState extends State<LoginPage> {
     if (!_formKey.currentState!.validate()) return;
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const DashboardPage()),
+      MaterialPageRoute<void>(
+        builder: (_) => DashboardPage(userEmail: _emailController.text.trim()),
+      ),
     );
   }
 
@@ -162,7 +165,9 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  const DashboardPage({super.key, this.userEmail = ''});
+
+  final String userEmail;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -369,6 +374,16 @@ class _DashboardPageState extends State<DashboardPage> {
         );
       case 3:
         return LoansPage(loans: _loans, onAdd: _addLoan, onReturn: _returnLoan);
+      case 4:
+        return ProfilePage(
+          userEmail: widget.userEmail,
+          onLogout: () {
+            Navigator.of(context).pushAndRemoveUntil<void>(
+              MaterialPageRoute<void>(builder: (_) => const LoginPage()),
+              (route) => false,
+            );
+          },
+        );
       default:
         return DashboardContent(
           books: _books,
@@ -497,6 +512,11 @@ class _DashboardPageState extends State<DashboardPage> {
             icon: Icon(Icons.swap_horiz),
             selectedIcon: Icon(Icons.swap_horiz),
             label: 'Transaksi',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profil',
           ),
         ],
       ),

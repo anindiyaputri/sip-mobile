@@ -77,4 +77,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Sedang Dipinjam (2)'), findsOneWidget);
   });
+
+  testWidgets('profile shows entered email and confirms logout', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const SipMobileApp());
+    await tester.enterText(find.byType(TextFormField).at(0), 'petugas@sip.id');
+    await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+    await tester.tap(find.text('Masuk'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Profil').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Nama belum tersedia'), findsOneWidget);
+    expect(find.text('petugas@sip.id'), findsNWidgets(2));
+    expect(find.text('Peran belum tersedia'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Edit Profil'), 240);
+    expect(find.text('Edit Profil'), findsOneWidget);
+    expect(find.text('Pengaturan Akun'), findsOneWidget);
+    expect(find.text('Tentang SIP Mobile'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Versi Aplikasi'), 240);
+    expect(find.text('1.0.0+1'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.byType(OutlinedButton), 240);
+    await tester.tap(find.text('Keluar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Keluar dari akun?'), findsOneWidget);
+    await tester.tap(find.text('Batal'));
+    await tester.pumpAndSettle();
+    expect(find.text('Profil'), findsWidgets);
+
+    await tester.tap(find.text('Keluar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Keluar').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Selamat datang'), findsOneWidget);
+  });
 }
