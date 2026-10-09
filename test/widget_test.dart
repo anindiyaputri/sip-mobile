@@ -27,4 +27,42 @@ void main() {
     expect(find.text('Sistem Informasi Perpustakaan'), findsOneWidget);
     expect(find.text('Ringkasan'), findsOneWidget);
   });
+
+  testWidgets('menus add books and process loan returns', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const SipMobileApp());
+    await tester.enterText(find.byType(TextFormField).at(0), 'admin@email.com');
+    await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+    await tester.tap(find.text('Masuk'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Buku').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Data Buku'), findsOneWidget);
+    await tester.tap(find.text('Tambah Buku'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'Buku Tes');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Penulis Tes');
+    await tester.enterText(find.byType(TextFormField).at(2), 'Umum');
+    await tester.enterText(find.byType(TextFormField).at(3), '2');
+    await tester.tap(find.text('Simpan'));
+    await tester.pumpAndSettle();
+    expect(find.text('Buku Tes'), findsOneWidget);
+
+    await tester.tap(find.text('Transaksi').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Sedang Dipinjam (2)'), findsOneWidget);
+    await tester.tap(find.byTooltip('Proses pengembalian').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Riwayat Pengembalian (1)'), findsOneWidget);
+    expect(find.text('Sedang Dipinjam (1)'), findsOneWidget);
+
+    await tester.tap(find.text('Pinjam Buku'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Simpan'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sedang Dipinjam (2)'), findsOneWidget);
+  });
 }
