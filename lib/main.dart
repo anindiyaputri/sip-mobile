@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/models/user_profile.dart';
 import 'package:flutter_application_1/pages/profile_page.dart';
 
 void main() {
@@ -49,7 +50,9 @@ class _LoginPageState extends State<LoginPage> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => DashboardPage(userEmail: _emailController.text.trim()),
+        builder: (_) => DashboardPage(
+          userProfile: UserProfile(email: _emailController.text.trim()),
+        ),
       ),
     );
   }
@@ -165,9 +168,9 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key, this.userEmail = ''});
+  const DashboardPage({super.key, required this.userProfile});
 
-  final String userEmail;
+  final UserProfile userProfile;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -376,7 +379,7 @@ class _DashboardPageState extends State<DashboardPage> {
         return LoansPage(loans: _loans, onAdd: _addLoan, onReturn: _returnLoan);
       case 4:
         return ProfilePage(
-          userEmail: widget.userEmail,
+          userProfile: widget.userProfile,
           onLogout: () {
             Navigator.of(context).pushAndRemoveUntil<void>(
               MaterialPageRoute<void>(builder: (_) => const LoginPage()),

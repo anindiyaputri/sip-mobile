@@ -89,9 +89,8 @@ void main() {
 
     await tester.tap(find.text('Profil').last);
     await tester.pumpAndSettle();
-    expect(find.text('Nama belum tersedia'), findsOneWidget);
+    expect(find.text('Belum tersedia'), findsWidgets);
     expect(find.text('petugas@sip.id'), findsNWidgets(2));
-    expect(find.text('Peran belum tersedia'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Edit Profil'), 240);
     expect(find.text('Edit Profil'), findsOneWidget);
     expect(find.text('Pengaturan Akun'), findsOneWidget);
@@ -112,5 +111,48 @@ void main() {
     await tester.tap(find.text('Keluar').last);
     await tester.pumpAndSettle();
     expect(find.text('Selamat datang'), findsOneWidget);
+  });
+
+  testWidgets('profile email follows each locally validated login', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const SipMobileApp());
+
+    Future<void> loginWith(String email) async {
+      await tester.enterText(find.byType(TextFormField).at(0), email);
+      await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+      await tester.tap(find.text('Masuk'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> logout() async {
+      await tester.tap(find.text('Profil').last);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.byType(OutlinedButton), 240);
+      await tester.tap(find.text('Keluar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Keluar').last);
+      await tester.pumpAndSettle();
+    }
+
+    await loginWith('pertama@sip.id');
+    await tester.tap(find.text('Buku').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Anggota').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Transaksi').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Profil').last);
+    await tester.pumpAndSettle();
+    expect(find.text('pertama@sip.id'), findsNWidgets(2));
+
+    await logout();
+    expect(find.text('Selamat datang'), findsOneWidget);
+
+    await loginWith('kedua@sip.id');
+    await tester.tap(find.text('Profil').last);
+    await tester.pumpAndSettle();
+    expect(find.text('kedua@sip.id'), findsNWidgets(2));
+    expect(find.text('pertama@sip.id'), findsNothing);
   });
 }

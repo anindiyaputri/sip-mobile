@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/models/user_profile.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({
     super.key,
-    required this.userEmail,
+    required this.userProfile,
     required this.onLogout,
   });
 
-  final String userEmail;
+  final UserProfile userProfile;
   final VoidCallback onLogout;
 
   static const _primaryColor = Color(0xFF3157D5);
 
-  String get _displayEmail =>
-      userEmail.isEmpty ? 'Email belum tersedia' : userEmail;
+  String _displayValue(String? value) =>
+      value == null || value.trim().isEmpty ? 'Belum tersedia' : value.trim();
 
   @override
   Widget build(BuildContext context) {
@@ -23,11 +24,20 @@ class ProfilePage extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
           children: [
-            _ProfileHeader(email: _displayEmail),
+            _ProfileHeader(
+              name: _displayValue(userProfile.name),
+              email: _displayValue(userProfile.email),
+              role: _displayValue(userProfile.role),
+            ),
             const SizedBox(height: 24),
             const _SectionTitle(title: 'Informasi Akun'),
             const SizedBox(height: 10),
-            _AccountDetails(email: _displayEmail),
+            _AccountDetails(
+              name: _displayValue(userProfile.name),
+              email: _displayValue(userProfile.email),
+              phone: _displayValue(userProfile.phone),
+              role: _displayValue(userProfile.role),
+            ),
             const SizedBox(height: 24),
             const _SectionTitle(title: 'Pengaturan'),
             const SizedBox(height: 10),
@@ -133,8 +143,8 @@ class ProfilePage extends StatelessWidget {
         icon: const Icon(Icons.logout, color: Color(0xFFB3261E)),
         title: const Text('Keluar dari akun?'),
         content: const Text(
-          'Anda akan kembali ke halaman masuk. Proses ini tidak menjalankan '
-          'operasi penghapusan atau perubahan database.',
+          'Anda akan kembali ke halaman masuk dan data profil lokal akan '
+          'dihapus dari state aplikasi. Autentikasi server belum tersedia.',
         ),
         actions: [
           TextButton(
@@ -157,9 +167,15 @@ class ProfilePage extends StatelessWidget {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.email});
+  const _ProfileHeader({
+    required this.name,
+    required this.email,
+    required this.role,
+  });
 
+  final String name;
   final String email;
+  final String role;
 
   @override
   Widget build(BuildContext context) {
@@ -185,8 +201,8 @@ class _ProfileHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
-            'Nama belum tersedia',
+          Text(
+            name,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
@@ -207,8 +223,8 @@ class _ProfileHeader extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text(
-              'Peran belum tersedia',
+            child: Text(
+              role,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 12,
@@ -223,32 +239,40 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _AccountDetails extends StatelessWidget {
-  const _AccountDetails({required this.email});
+  const _AccountDetails({
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.role,
+  });
 
+  final String name;
   final String email;
+  final String phone;
+  final String role;
 
   @override
   Widget build(BuildContext context) {
     return _SettingsCard(
       children: [
-        const _DetailRow(
+        _DetailRow(
           icon: Icons.badge_outlined,
           label: 'Nama lengkap',
-          value: 'Belum tersedia',
+          value: name,
         ),
         const Divider(height: 1, indent: 56),
         _DetailRow(icon: Icons.email_outlined, label: 'Email', value: email),
         const Divider(height: 1, indent: 56),
-        const _DetailRow(
+        _DetailRow(
           icon: Icons.phone_outlined,
           label: 'Nomor telepon',
-          value: 'Belum tersedia',
+          value: phone,
         ),
         const Divider(height: 1, indent: 56),
-        const _DetailRow(
+        _DetailRow(
           icon: Icons.admin_panel_settings_outlined,
           label: 'Peran pengguna',
-          value: 'Belum tersedia',
+          value: role,
         ),
       ],
     );
