@@ -110,6 +110,7 @@ void main() {
       240,
     );
     expect(find.text('Edit Profil'), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
     expect(find.text('Pengaturan Akun'), findsOneWidget);
     expect(find.text('Tentang SIP Mobile'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Versi Aplikasi'), 240);
