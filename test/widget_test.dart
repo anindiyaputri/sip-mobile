@@ -217,6 +217,21 @@ void main() {
         find.byKey(const Key('profile_name_field')),
         'Dewi Putri',
       );
+      await tester.tap(find.byKey(const Key('profile_phone_field')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: find.byKey(const Key('profile_phone_field')),
+                matching: find.byType(EditableText),
+              ),
+            )
+            .focusNode
+            .hasFocus,
+        isTrue,
+      );
+      expect(tester.testTextInput.isVisible, isTrue);
       await tester.enterText(
         find.byKey(const Key('profile_phone_field')),
         '+628123456789',
@@ -300,6 +315,21 @@ void main() {
         find.byKey(const Key('account_settings_name_field')),
         'Rani Aulia',
       );
+      await tester.tap(find.byKey(const Key('account_settings_phone_field')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: find.byKey(const Key('account_settings_phone_field')),
+                matching: find.byType(EditableText),
+              ),
+            )
+            .focusNode
+            .hasFocus,
+        isTrue,
+      );
+      expect(tester.testTextInput.isVisible, isTrue);
       await tester.enterText(
         find.byKey(const Key('account_settings_phone_field')),
         '081234567890',

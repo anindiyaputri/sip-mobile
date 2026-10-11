@@ -101,6 +101,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
         child: Form(
           key: _formKey,
           child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
             children: [
               const Text(
@@ -160,6 +161,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                 enabled: !_isSaving,
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.done,
+                scrollPadding: const EdgeInsets.only(bottom: 120),
                 decoration: const InputDecoration(
                   labelText: 'Nomor telepon (opsional)',
                   prefixIcon: Icon(Icons.phone_outlined),

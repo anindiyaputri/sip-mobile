@@ -373,53 +373,53 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Edit Profil'),
+      scrollable: true,
       content: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                key: const Key('profile_name_field'),
-                controller: _nameController,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Nama lengkap',
-                  prefixIcon: Icon(Icons.badge_outlined),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Nama lengkap wajib diisi';
-                  }
-                  return null;
-                },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              key: const Key('profile_name_field'),
+              controller: _nameController,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Nama lengkap',
+                prefixIcon: Icon(Icons.badge_outlined),
               ),
-              const SizedBox(height: 14),
-              TextFormField(
-                key: const Key('profile_phone_field'),
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Nomor telepon (opsional)',
-                  prefixIcon: Icon(Icons.phone_outlined),
-                ),
-                validator: (value) {
-                  final phone = value?.trim() ?? '';
-                  if (phone.isNotEmpty &&
-                      !RegExp(r'^\+?[0-9 -]{7,20}$').hasMatch(phone)) {
-                    return 'Masukkan nomor telepon yang valid';
-                  }
-                  return null;
-                },
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Nama lengkap wajib diisi';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              key: const Key('profile_phone_field'),
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              scrollPadding: const EdgeInsets.only(bottom: 120),
+              decoration: const InputDecoration(
+                labelText: 'Nomor telepon (opsional)',
+                prefixIcon: Icon(Icons.phone_outlined),
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'Email dan peran tidak dapat diubah di sini.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF687386)),
-              ),
-            ],
-          ),
+              validator: (value) {
+                final phone = value?.trim() ?? '';
+                if (phone.isNotEmpty &&
+                    !RegExp(r'^\+?[0-9 -]{7,20}$').hasMatch(phone)) {
+                  return 'Masukkan nomor telepon yang valid';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Email dan peran tidak dapat diubah di sini.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF687386)),
+            ),
+          ],
         ),
       ),
       actions: [
