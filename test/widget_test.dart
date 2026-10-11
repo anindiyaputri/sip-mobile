@@ -105,8 +105,11 @@ void main() {
     expect(find.text('Nomor telepon belum diisi'), findsOneWidget);
     expect(find.text('petugas@sip.id'), findsNWidgets(2));
     expect(find.text('Peran pengguna'), findsNothing);
-    await tester.scrollUntilVisible(find.text('Edit Profil'), 240);
-    expect(find.text('Edit Profil'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('profile_account_settings')),
+      240,
+    );
+    expect(find.text('Edit Profil'), findsNothing);
     expect(find.text('Pengaturan Akun'), findsOneWidget);
     expect(find.text('Tentang SIP Mobile'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Versi Aplikasi'), 240);
@@ -192,76 +195,7 @@ void main() {
   });
 
   testWidgets(
-    'edit profile updates session details without changing email or role',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(const SipMobileApp());
-      await tester.enterText(
-        find.byType(TextFormField).at(0),
-        'profile@sip.id',
-      );
-      await tester.enterText(find.byType(TextFormField).at(1), 'password123');
-      await tester.tap(find.text('Masuk'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Profil').last);
-      await tester.pumpAndSettle();
-
-      await tester.scrollUntilVisible(find.text('Edit Profil'), 240);
-      await tester.tap(find.text('Edit Profil'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Simpan'));
-      await tester.pumpAndSettle();
-      expect(find.text('Nama lengkap wajib diisi'), findsOneWidget);
-
-      await tester.enterText(
-        find.byKey(const Key('profile_name_field')),
-        'Dewi Putri',
-      );
-      await tester.tap(find.byKey(const Key('profile_phone_field')));
-      await tester.pump();
-      expect(
-        tester
-            .widget<EditableText>(
-              find.descendant(
-                of: find.byKey(const Key('profile_phone_field')),
-                matching: find.byType(EditableText),
-              ),
-            )
-            .focusNode
-            .hasFocus,
-        isTrue,
-      );
-      expect(tester.testTextInput.isVisible, isTrue);
-      await tester.enterText(
-        find.byKey(const Key('profile_phone_field')),
-        '+628123456789',
-      );
-      await tester.tap(find.text('Simpan'));
-      await tester.pumpAndSettle();
-
-      await tester.drag(find.byType(ListView), const Offset(0, 1000));
-      await tester.pumpAndSettle();
-      expect(find.text('Dewi Putri'), findsWidgets);
-      await tester.scrollUntilVisible(find.text('+628123456789'), 240);
-      expect(find.text('+628123456789'), findsOneWidget);
-      expect(find.text('profile@sip.id'), findsWidgets);
-      expect(find.text('Peran pengguna'), findsNothing);
-      expect(
-        find.text(
-          'Profil disimpan di perangkat ini; belum disinkronkan ke server.',
-        ),
-        findsOneWidget,
-      );
-
-      final savedProfile = await UserProfileLocalStore().load('profile@sip.id');
-      expect(savedProfile.name, 'Dewi Putri');
-      expect(savedProfile.phone, '+628123456789');
-      expect(savedProfile.email, 'profile@sip.id');
-    },
-  );
-
-  testWidgets(
-    'account settings edit profile and return updates the profile page',
+    'account settings updates profile details and returns to profile page',
     (WidgetTester tester) async {
       await tester.pumpWidget(const SipMobileApp());
       await tester.enterText(find.byType(TextFormField).at(0), 'akun@sip.id');
@@ -289,6 +223,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Pengaturan Akun'), findsOneWidget);
+      expect(find.text('Data Profil'), findsOneWidget);
+      expect(find.text('Edit Profil'), findsNothing);
       expect(find.byType(TextFormField), findsNWidgets(2));
 
       await tester.enterText(

@@ -51,18 +51,6 @@ class ProfilePage extends StatelessWidget {
               ),
               role: userProfile.role,
             ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () => _editProfile(context),
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Edit Profil'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
             const SizedBox(height: 20),
             Card(
               margin: EdgeInsets.zero,
@@ -145,33 +133,6 @@ class ProfilePage extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _editProfile(BuildContext context) async {
-    final updatedProfile = await showDialog<UserProfile>(
-      context: context,
-      builder: (_) => _EditProfileDialog(userProfile: userProfile),
-    );
-    if (updatedProfile == null) return;
-
-    var saved = false;
-    try {
-      saved = await onProfileUpdated(updatedProfile);
-    } on Exception {
-      saved = false;
-    }
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            saved
-                ? 'Profil disimpan di perangkat ini; belum disinkronkan ke server.'
-                : 'Profil gagal disimpan. Silakan coba lagi.',
-          ),
-        ),
-      );
   }
 
   void _showAboutDialog(BuildContext context) {
@@ -337,112 +298,6 @@ class _AccountDetails extends StatelessWidget {
   }
 }
 
-class _EditProfileDialog extends StatefulWidget {
-  const _EditProfileDialog({required this.userProfile});
-
-  final UserProfile userProfile;
-
-  @override
-  State<_EditProfileDialog> createState() => _EditProfileDialogState();
-}
-
-class _EditProfileDialogState extends State<_EditProfileDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nameController;
-  late final TextEditingController _phoneController;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(
-      text: widget.userProfile.name ?? '',
-    );
-    _phoneController = TextEditingController(
-      text: widget.userProfile.phone ?? '',
-    );
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Edit Profil'),
-      scrollable: true,
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              key: const Key('profile_name_field'),
-              controller: _nameController,
-              textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Nama lengkap',
-                prefixIcon: Icon(Icons.badge_outlined),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Nama lengkap wajib diisi';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              key: const Key('profile_phone_field'),
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              scrollPadding: const EdgeInsets.only(bottom: 120),
-              decoration: const InputDecoration(
-                labelText: 'Nomor telepon (opsional)',
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-              validator: (value) {
-                final phone = value?.trim() ?? '';
-                if (phone.isNotEmpty &&
-                    !RegExp(r'^\+?[0-9 -]{7,20}$').hasMatch(phone)) {
-                  return 'Masukkan nomor telepon yang valid';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Email dan peran tidak dapat diubah di sini.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF687386)),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Batal'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (!_formKey.currentState!.validate()) return;
-            Navigator.of(context).pop(
-              widget.userProfile.withEditableDetails(
-                name: _nameController.text,
-                phone: _phoneController.text,
-              ),
-            );
-          },
-          child: const Text('Simpan'),
-        ),
-      ],
-    );
-  }
-}
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title});

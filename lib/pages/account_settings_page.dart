@@ -126,7 +126,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
               ],
               const SizedBox(height: 24),
               const Text(
-                'Edit Profil',
+                'Data Profil',
                 style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
