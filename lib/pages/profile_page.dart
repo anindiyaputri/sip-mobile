@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:flutter_application_1/models/user_profile.dart';
 import 'package:flutter_application_1/pages/account_settings_page.dart';
+import 'package:flutter_application_1/services/user_profile_photo_store.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({
     super.key,
     required this.userProfile,
@@ -15,10 +20,102 @@ class ProfilePage extends StatelessWidget {
   final Future<bool> Function(UserProfile profile) onProfileUpdated;
   final VoidCallback onLogout;
 
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
   static const _primaryColor = Color(0xFF3157D5);
+  final _imagePicker = ImagePicker();
+  final _photoStore = UserProfilePhotoStore();
+  String? _photoPath;
+  bool _isChangingPhoto = false;
 
   String _displayValue(String? value, {String fallback = 'Belum tersedia'}) =>
       value == null || value.trim().isEmpty ? fallback : value.trim();
+
+  UserProfile get userProfile => widget.userProfile;
+  Future<bool> Function(UserProfile profile) get onProfileUpdated =>
+      widget.onProfileUpdated;
+  VoidCallback get onLogout => widget.onLogout;
+
+  @override
+  void initState() {
+    super.initState();
+    _photoPath = userProfile.photoPath;
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfilePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userProfile.photoPath != userProfile.photoPath) {
+      _photoPath = userProfile.photoPath;
+    }
+  }
+
+  Future<void> _changeProfilePhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Ambil foto menggunakan kamera'),
+              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Pilih foto dari galeri'),
+              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    setState(() => _isChangingPhoto = true);
+    try {
+      final pickedImage = await _imagePicker.pickImage(source: source);
+      if (pickedImage == null || !mounted) return;
+
+      final persistentPath = await _photoStore.savePickedImage(
+        email: userProfile.email,
+        sourcePath: pickedImage.path,
+      );
+      final updatedProfile = userProfile.withProfilePhoto(persistentPath);
+      final saved = await onProfileUpdated(updatedProfile);
+      if (!mounted) return;
+
+      if (!saved) {
+        _showPhotoMessage(
+          'Foto profil gagal disimpan. Silakan coba lagi.',
+        );
+        return;
+      }
+      setState(() => _photoPath = persistentPath);
+    } on PlatformException catch (error) {
+      if (!mounted) return;
+      _showPhotoMessage(
+        'Akses kamera atau galeri gagal: ${error.message ?? error.code}',
+      );
+    } on FileSystemException catch (error) {
+      if (!mounted) return;
+      _showPhotoMessage('File foto tidak dapat disimpan: ${error.message}');
+    } on Exception catch (error) {
+      if (!mounted) return;
+      _showPhotoMessage('Foto profil gagal diperbarui: $error');
+    } finally {
+      if (mounted) setState(() => _isChangingPhoto = false);
+    }
+  }
+
+  void _showPhotoMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +132,9 @@ class ProfilePage extends StatelessWidget {
               ),
               email: _displayValue(userProfile.email),
               role: userProfile.role,
+              photoPath: _photoPath,
+              isChangingPhoto: _isChangingPhoto,
+              onChangePhoto: _changeProfilePhoto,
             ),
             const SizedBox(height: 24),
             const _SectionTitle(title: 'Informasi Akun'),
@@ -186,11 +286,17 @@ class _ProfileHeader extends StatelessWidget {
     required this.name,
     required this.email,
     required this.role,
+    required this.photoPath,
+    required this.isChangingPhoto,
+    required this.onChangePhoto,
   });
 
   final String name;
   final String email;
   final String? role;
+  final String? photoPath;
+  final bool isChangingPhoto;
+  final VoidCallback onChangePhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -206,15 +312,66 @@ class _ProfileHeader extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const CircleAvatar(
-            radius: 42,
-            backgroundColor: Colors.white,
-            child: Icon(
-              Icons.person_outline,
-              size: 46,
-              color: Color(0xFF3157D5),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 84,
+                height: 84,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: photoPath == null || photoPath!.isEmpty
+                    ? const Icon(
+                        Icons.person_outline,
+                        size: 46,
+                        color: Color(0xFF3157D5),
+                      )
+                    : Image.file(
+                          key: const Key('profile_photo_image'),
+                          File(photoPath!),
+                          fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(
+                              Icons.person_outline,
+                              size: 46,
+                              color: Color(0xFF3157D5),
+                            ),
+                      ),
+              ),
+              Positioned(
+                right: -2,
+                bottom: -2,
+                child: Material(
+                  color: Colors.white,
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    key: const Key('profile_photo_button'),
+                    tooltip: 'Ganti foto profil',
+                    onPressed: isChangingPhoto ? null : onChangePhoto,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 34,
+                      height: 34,
+                    ),
+                    padding: EdgeInsets.zero,
+                    icon: isChangingPhoto
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(
+                            Icons.camera_alt_outlined,
+                            size: 19,
+                            color: Color(0xFF3157D5),
+                          ),
+                  ),
+                ),
+              ),
+            ],
             ),
-          ),
           const SizedBox(height: 14),
           Text(
             name,

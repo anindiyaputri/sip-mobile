@@ -5,12 +5,15 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_application_1/main.dart';
 import 'package:flutter_application_1/models/user_profile.dart';
+import 'package:flutter_application_1/services/user_profile_photo_store.dart';
 import 'package:flutter_application_1/services/user_profile_local_store.dart';
 
 void main() {
@@ -67,6 +70,66 @@ void main() {
     },
   );
 
+  test(
+    'profile photo is copied locally and stays with the account profile',
+    () async {
+      final temporaryDirectory = await Directory.systemTemp.createTemp(
+        'sip-profile-photo-test-',
+      );
+      try {
+        final sourceFile = File(
+          '${temporaryDirectory.path}${Platform.pathSeparator}selected.png',
+        );
+        await sourceFile.writeAsBytes([1, 2, 3, 4]);
+        final photoStore = UserProfilePhotoStore(
+          documentsDirectoryProvider: () async => temporaryDirectory,
+        );
+        final photoPath = await photoStore.savePickedImage(
+          email: '  ADMIN@gmail.com ',
+          sourcePath: sourceFile.path,
+        );
+        expect(photoPath, isNot(sourceFile.path));
+        expect(await File(photoPath).readAsBytes(), [1, 2, 3, 4]);
+
+        final replacementFile = File(
+          '${temporaryDirectory.path}${Platform.pathSeparator}replacement.png',
+        );
+        await replacementFile.writeAsBytes([5, 6, 7, 8]);
+        final replacementPath = await photoStore.savePickedImage(
+          email: 'admin@gmail.com',
+          sourcePath: replacementFile.path,
+        );
+        expect(replacementPath, isNot(photoPath));
+        expect(await File(replacementPath).readAsBytes(), [5, 6, 7, 8]);
+
+        final localStore = UserProfileLocalStore();
+        await localStore.save(
+          const UserProfile(email: 'admin@gmail.com', name: 'Admin'),
+        );
+        final profile = await localStore.loadForLogin('admin@gmail.com');
+        final profileWithPhoto = profile.withProfilePhoto(replacementPath);
+        expect(await localStore.save(profileWithPhoto), isTrue);
+
+        final reloaded = await localStore.loadForLogin(' ADMIN@gmail.com ');
+        expect(reloaded.name, 'Admin');
+        expect(reloaded.photoPath, replacementPath);
+
+        final edited = reloaded.withEditableDetails(
+          name: 'Admin SIP',
+          phone: '081234567890',
+        );
+        expect(edited.photoPath, replacementPath);
+        expect(await localStore.save(edited), isTrue);
+        expect(
+          (await localStore.load('admin@gmail.com')).photoPath,
+          replacementPath,
+        );
+      } finally {
+        await temporaryDirectory.delete(recursive: true);
+      }
+    },
+  );
+
   testWidgets('admin name is saved and shown on profile and account settings', (
     WidgetTester tester,
   ) async {
@@ -82,6 +145,14 @@ void main() {
     await tester.tap(find.text('Profil').last);
     await tester.pumpAndSettle();
     expect(find.text('Admin'), findsNWidgets(2));
+    expect(find.byKey(const Key('profile_photo_button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('profile_photo_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ambil foto menggunakan kamera'), findsOneWidget);
+    expect(find.text('Pilih foto dari galeri'), findsOneWidget);
+    Navigator.of(tester.element(find.text('Ambil foto menggunakan kamera')))
+        .pop();
+    await tester.pumpAndSettle();
 
     final savedProfile = await UserProfileLocalStore().load('admin@gmail.com');
     expect(savedProfile.name, 'Admin');

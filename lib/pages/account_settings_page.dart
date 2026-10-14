@@ -45,6 +45,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
         email: widget.userProfile.email,
         name: storedProfile.name ?? widget.userProfile.name,
         phone: storedProfile.phone ?? widget.userProfile.phone,
+        photoPath: storedProfile.photoPath ?? widget.userProfile.photoPath,
         role: widget.userProfile.role,
       );
       setState(() {

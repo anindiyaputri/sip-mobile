@@ -17,8 +17,10 @@ class UserProfileLocalStore {
 
     final name = decoded['name'];
     final phone = decoded['phone'];
+    final photoPath = decoded['photoPath'];
     if ((name != null && name is! String) ||
-        (phone != null && phone is! String)) {
+        (phone != null && phone is! String) ||
+        (photoPath != null && photoPath is! String)) {
       throw const FormatException('Data profil lokal memiliki format salah.');
     }
 
@@ -26,6 +28,7 @@ class UserProfileLocalStore {
       email: email,
       name: name as String?,
       phone: phone as String?,
+      photoPath: photoPath as String?,
     );
   }
 
@@ -46,6 +49,7 @@ class UserProfileLocalStore {
       email: email.trim(),
       name: 'Admin',
       phone: profile.phone,
+      photoPath: profile.photoPath,
       role: profile.role,
     );
     final saved = await save(adminProfile);
@@ -59,7 +63,11 @@ class UserProfileLocalStore {
     final preferences = await SharedPreferences.getInstance();
     return preferences.setString(
       _keyFor(profile.email),
-      jsonEncode({'name': profile.name, 'phone': profile.phone}),
+      jsonEncode({
+        'name': profile.name,
+        'phone': profile.phone,
+        'photoPath': profile.photoPath,
+      }),
     );
   }
 

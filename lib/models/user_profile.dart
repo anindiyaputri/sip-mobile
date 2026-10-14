@@ -4,6 +4,7 @@ class UserProfile {
     this.id,
     this.name,
     this.phone,
+    this.photoPath,
     this.role,
   });
 
@@ -11,6 +12,7 @@ class UserProfile {
   final String? id;
   final String? name;
   final String? phone;
+  final String? photoPath;
   final String? role;
 
   UserProfile withEditableDetails({
@@ -24,6 +26,18 @@ class UserProfile {
       email: email,
       name: trimmedName.isEmpty ? null : trimmedName,
       phone: trimmedPhone.isEmpty ? null : trimmedPhone,
+      photoPath: photoPath,
+      role: role,
+    );
+  }
+
+  UserProfile withProfilePhoto(String path) {
+    return UserProfile(
+      id: id,
+      email: email,
+      name: name,
+      phone: phone,
+      photoPath: path,
       role: role,
     );
   }
