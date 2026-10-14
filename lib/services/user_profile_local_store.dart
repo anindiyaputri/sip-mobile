@@ -29,6 +29,32 @@ class UserProfileLocalStore {
     );
   }
 
+  Future<UserProfile> loadForLogin(String email) async {
+    final profile = await load(email);
+    final normalizedEmail = email.trim().toLowerCase();
+    final normalizedName = profile.name?.trim().toLowerCase();
+    final shouldInitializeAdminName =
+        normalizedEmail == 'admin@gmail.com' &&
+        (normalizedName == null ||
+            normalizedName.isEmpty ||
+            normalizedName == 'nama belum diisi');
+
+    if (!shouldInitializeAdminName) return profile;
+
+    final adminProfile = UserProfile(
+      id: profile.id,
+      email: email.trim(),
+      name: 'Admin',
+      phone: profile.phone,
+      role: profile.role,
+    );
+    final saved = await save(adminProfile);
+    if (!saved) {
+      throw StateError('Nama Admin gagal disimpan di perangkat ini.');
+    }
+    return adminProfile;
+  }
+
   Future<bool> save(UserProfile profile) async {
     final preferences = await SharedPreferences.getInstance();
     return preferences.setString(

@@ -54,7 +54,7 @@ class _LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim();
     setState(() => _isSigningIn = true);
     try {
-      final userProfile = await _profileStore.load(email);
+      final userProfile = await _profileStore.loadForLogin(email);
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(

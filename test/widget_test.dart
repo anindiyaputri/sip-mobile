@@ -38,6 +38,95 @@ void main() {
     expect(otherAccount.phone, isNull);
   });
 
+  test(
+    'admin login initializes the default name without replacing custom name',
+    () async {
+      final store = UserProfileLocalStore();
+
+      final adminProfile = await store.loadForLogin('  ADMIN@gmail.com ');
+      expect(adminProfile.email, 'ADMIN@gmail.com');
+      expect(adminProfile.name, 'Admin');
+      expect((await store.load('admin@gmail.com')).name, 'Admin');
+
+      await store.save(
+        const UserProfile(
+          email: 'admin@gmail.com',
+          name: 'Nama belum diisi',
+          phone: '081234567890',
+        ),
+      );
+      final placeholderProfile = await store.loadForLogin('admin@gmail.com');
+      expect(placeholderProfile.name, 'Admin');
+      expect(placeholderProfile.phone, '081234567890');
+
+      await store.save(
+        const UserProfile(email: 'admin@gmail.com', name: 'Nama Pilihan'),
+      );
+      final customizedProfile = await store.loadForLogin('admin@gmail.com');
+      expect(customizedProfile.name, 'Nama Pilihan');
+    },
+  );
+
+  testWidgets('admin name is saved and shown on profile and account settings', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const SipMobileApp());
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      '  ADMIN@gmail.com ',
+    );
+    await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+    await tester.tap(find.text('Masuk'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Profil').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Admin'), findsNWidgets(2));
+
+    final savedProfile = await UserProfileLocalStore().load('admin@gmail.com');
+    expect(savedProfile.name, 'Admin');
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('profile_account_settings')),
+      240,
+    );
+    await tester.tap(find.byKey(const Key('profile_account_settings')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const Key('account_settings_name_field')),
+          )
+          .controller!
+          .text,
+      'Admin',
+    );
+
+    await tester.tap(find.byTooltip('Kembali ke Profil'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('profile_logout_button')),
+      240,
+    );
+    await tester.tap(find.byKey(const Key('profile_logout_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Keluar'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'admin@gmail.com');
+    await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+    await tester.tap(find.text('Masuk'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Profil').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Admin'), findsNWidgets(2));
+  });
+
   testWidgets('login opens the dashboard after valid input', (
     WidgetTester tester,
   ) async {
