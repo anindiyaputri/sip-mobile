@@ -10,11 +10,32 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_application_1/main.dart';
+import 'package:flutter_application_1/models/user_profile.dart';
 import 'package:flutter_application_1/services/user_profile_local_store.dart';
 
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  test('profile storage normalizes email and isolates accounts', () async {
+    final store = UserProfileLocalStore();
+    final saved = await store.save(
+      const UserProfile(
+        email: '  Akun@SIP.id ',
+        name: 'Nama Akun',
+        phone: '081234567890',
+      ),
+    );
+
+    expect(saved, isTrue);
+    final sameAccount = await store.load('akun@sip.id');
+    expect(sameAccount.name, 'Nama Akun');
+    expect(sameAccount.phone, '081234567890');
+
+    final otherAccount = await store.load('akun-lain@sip.id');
+    expect(otherAccount.name, isNull);
+    expect(otherAccount.phone, isNull);
   });
 
   testWidgets('login opens the dashboard after valid input', (
@@ -301,8 +322,28 @@ void main() {
       expect(savedProfile.name, 'Rani Aulia');
       expect(savedProfile.phone, '081234567890');
 
-      await tester.pumpWidget(SipMobileApp(key: UniqueKey()));
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('profile_logout_button')),
+        240,
+      );
+      await tester.tap(find.byKey(const Key('profile_logout_button')));
       await tester.pumpAndSettle();
+      expect(find.text('Keluar dari akun?'), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Keluar'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Selamat Datang Kembali'), findsOneWidget);
+
+      final profileAfterLogout = await UserProfileLocalStore().load(
+        'akun@sip.id',
+      );
+      expect(profileAfterLogout.name, 'Rani Aulia');
+      expect(profileAfterLogout.phone, '081234567890');
+
       await tester.enterText(find.byType(TextFormField).at(0), 'akun@sip.id');
       await tester.enterText(find.byType(TextFormField).at(1), 'password123');
       await tester.tap(find.text('Masuk'));

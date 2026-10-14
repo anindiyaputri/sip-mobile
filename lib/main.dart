@@ -37,7 +37,9 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _profileStore = UserProfileLocalStore();
   bool _obscurePassword = true;
+  bool _isSigningIn = false;
 
   @override
   void dispose() {
@@ -46,16 +48,30 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _signIn() {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _signIn() async {
+    if (_isSigningIn || !_formKey.currentState!.validate()) return;
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => DashboardPage(
-          userProfile: UserProfile(email: _emailController.text.trim()),
+    final email = _emailController.text.trim();
+    setState(() => _isSigningIn = true);
+    try {
+      final userProfile = await _profileStore.load(email);
+      if (!mounted) return;
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => DashboardPage(userProfile: userProfile),
         ),
-      ),
-    );
+      );
+    } on Exception catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Data profil lokal gagal dimuat: $error')),
+        );
+    } finally {
+      if (mounted) setState(() => _isSigningIn = false);
+    }
   }
 
   @override
@@ -206,7 +222,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           SizedBox(height: isKeyboardVisible ? 16 : 24),
                           FilledButton(
-                            onPressed: _signIn,
+                            onPressed: _isSigningIn ? null : _signIn,
                             style: FilledButton.styleFrom(
                               backgroundColor: const Color(0xFF3157D5),
                               foregroundColor: Colors.white,
@@ -221,7 +237,16 @@ class _LoginPageState extends State<LoginPage> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            child: const Text('Masuk'),
+                            child: _isSigningIn
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text('Masuk'),
                           ),
                         ],
                       ),
@@ -365,8 +390,6 @@ class _DashboardPageState extends State<DashboardPage> {
   String _bookSearch = '';
   late UserProfile _userProfile;
   final _profileStore = UserProfileLocalStore();
-  bool _isProfileLoaded = false;
-  String? _profileLoadError;
   int _nextBookId = 4;
   int _nextMemberId = 3;
   int _nextLoanId = 3;
@@ -435,31 +458,6 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _userProfile = widget.userProfile;
-    _loadSavedProfile();
-  }
-
-  Future<void> _loadSavedProfile() async {
-    try {
-      final savedProfile = await _profileStore.load(widget.userProfile.email);
-      if (!mounted) return;
-      setState(() {
-        _userProfile = UserProfile(
-          id: widget.userProfile.id,
-          email: widget.userProfile.email,
-          name: savedProfile.name ?? widget.userProfile.name,
-          phone: savedProfile.phone ?? widget.userProfile.phone,
-          role: widget.userProfile.role,
-        );
-        _isProfileLoaded = true;
-        _profileLoadError = null;
-      });
-    } on Exception catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _isProfileLoaded = false;
-        _profileLoadError = error.toString();
-      });
-    }
   }
 
   Future<bool> _saveProfile(UserProfile profile) async {
@@ -552,38 +550,6 @@ class _DashboardPageState extends State<DashboardPage> {
       case 3:
         return LoansPage(loans: _loans, onAdd: _addLoan, onReturn: _returnLoan);
       case 4:
-        if (!_isProfileLoaded) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Profil')),
-            body: Center(
-              child: _profileLoadError == null
-                  ? const CircularProgressIndicator()
-                  : Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Data profil lokal gagal dimuat.',
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _profileLoadError!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.black54),
-                          ),
-                          const SizedBox(height: 16),
-                          FilledButton(
-                            onPressed: _loadSavedProfile,
-                            child: const Text('Coba lagi'),
-                          ),
-                        ],
-                      ),
-                    ),
-            ),
-          );
-        }
         return ProfilePage(
           userProfile: _userProfile,
           onProfileUpdated: _saveProfile,

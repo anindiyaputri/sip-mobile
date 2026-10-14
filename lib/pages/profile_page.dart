@@ -158,8 +158,8 @@ class ProfilePage extends StatelessWidget {
         icon: const Icon(Icons.logout, color: Color(0xFFB3261E)),
         title: const Text('Keluar dari akun?'),
         content: const Text(
-          'Anda akan kembali ke halaman masuk dan data profil lokal akan '
-          'dihapus dari state aplikasi. Autentikasi server belum tersedia.',
+          'Anda akan kembali ke halaman masuk. Nama dan nomor telepon tetap '
+          'tersimpan secara lokal di perangkat ini.',
         ),
         actions: [
           TextButton(
@@ -297,7 +297,6 @@ class _AccountDetails extends StatelessWidget {
     );
   }
 }
-
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title});
