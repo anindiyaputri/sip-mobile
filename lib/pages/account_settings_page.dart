@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_application_1/models/user_profile.dart';
+import 'package:flutter_application_1/services/user_profile_local_store.dart';
 
 class AccountSettingsPage extends StatefulWidget {
   const AccountSettingsPage({
@@ -18,9 +19,11 @@ class AccountSettingsPage extends StatefulWidget {
 
 class _AccountSettingsPageState extends State<AccountSettingsPage> {
   final _formKey = GlobalKey<FormState>();
+  final _profileStore = UserProfileLocalStore();
   late UserProfile _userProfile;
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
+  bool _isLoadingProfile = true;
   bool _isSaving = false;
 
   @override
@@ -29,6 +32,36 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     _userProfile = widget.userProfile;
     _nameController = TextEditingController(text: _userProfile.name ?? '');
     _phoneController = TextEditingController(text: _userProfile.phone ?? '');
+    _loadStoredProfile();
+  }
+
+  Future<void> _loadStoredProfile() async {
+    try {
+      final storedProfile = await _profileStore.load(widget.userProfile.email);
+      if (!mounted) return;
+
+      final loadedProfile = UserProfile(
+        id: widget.userProfile.id,
+        email: widget.userProfile.email,
+        name: storedProfile.name ?? widget.userProfile.name,
+        phone: storedProfile.phone ?? widget.userProfile.phone,
+        role: widget.userProfile.role,
+      );
+      setState(() {
+        _userProfile = loadedProfile;
+        _nameController.text = loadedProfile.name ?? '';
+        _phoneController.text = loadedProfile.phone ?? '';
+        _isLoadingProfile = false;
+      });
+    } on Exception catch (error) {
+      if (!mounted) return;
+      setState(() => _isLoadingProfile = false);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Data profil lokal gagal dimuat: $error')),
+        );
+    }
   }
 
   @override
@@ -139,7 +172,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
               TextFormField(
                 key: const Key('account_settings_name_field'),
                 controller: _nameController,
-                enabled: !_isSaving,
+                enabled: !_isLoadingProfile && !_isSaving,
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
@@ -158,7 +191,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
               TextFormField(
                 key: const Key('account_settings_phone_field'),
                 controller: _phoneController,
-                enabled: !_isSaving,
+                enabled: !_isLoadingProfile && !_isSaving,
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.done,
                 scrollPadding: const EdgeInsets.only(bottom: 120),
@@ -181,7 +214,9 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _isSaving ? null : _cancelChanges,
+                      onPressed: _isLoadingProfile || _isSaving
+                          ? null
+                          : _cancelChanges,
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(50),
                         shape: RoundedRectangleBorder(
@@ -194,14 +229,16 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton(
-                      onPressed: _isSaving ? null : _saveChanges,
+                      onPressed: _isLoadingProfile || _isSaving
+                          ? null
+                          : _saveChanges,
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(50),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: _isSaving
+                      child: _isLoadingProfile || _isSaving
                           ? const SizedBox(
                               width: 20,
                               height: 20,

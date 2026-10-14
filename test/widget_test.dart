@@ -323,6 +323,33 @@ void main() {
       expect(savedProfile.phone, '081234567890');
 
       await tester.scrollUntilVisible(
+        find.byKey(const Key('profile_account_settings')),
+        240,
+      );
+      await tester.tap(find.byKey(const Key('profile_account_settings')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.byKey(const Key('account_settings_name_field')),
+            )
+            .controller!
+            .text,
+        'Rani Aulia',
+      );
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.byKey(const Key('account_settings_phone_field')),
+            )
+            .controller!
+            .text,
+        '081234567890',
+      );
+      await tester.tap(find.byTooltip('Kembali ke Profil'));
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
         find.byKey(const Key('profile_logout_button')),
         240,
       );
