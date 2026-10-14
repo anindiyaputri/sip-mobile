@@ -227,6 +227,15 @@ void main() {
       expect(find.text('Data Profil'), findsOneWidget);
       expect(find.text('Edit Profil'), findsNothing);
       expect(find.byType(TextFormField), findsNWidgets(2));
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.byKey(const Key('account_settings_name_field')),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
 
       await tester.enterText(
         find.byKey(const Key('account_settings_name_field')),
@@ -291,6 +300,42 @@ void main() {
       final savedProfile = await UserProfileLocalStore().load('akun@sip.id');
       expect(savedProfile.name, 'Rani Aulia');
       expect(savedProfile.phone, '081234567890');
+
+      await tester.pumpWidget(SipMobileApp(key: UniqueKey()));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), 'akun@sip.id');
+      await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+      await tester.tap(find.text('Masuk'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Profil').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Rani Aulia'), findsNWidgets(2));
+      expect(find.text('081234567890'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('profile_account_settings')),
+        240,
+      );
+      await tester.tap(find.byKey(const Key('profile_account_settings')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.byKey(const Key('account_settings_name_field')),
+            )
+            .controller!
+            .text,
+        'Rani Aulia',
+      );
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.byKey(const Key('account_settings_phone_field')),
+            )
+            .controller!
+            .text,
+        '081234567890',
+      );
     },
   );
 }
