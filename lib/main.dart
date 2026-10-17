@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/models/library_models.dart';
+import 'package:flutter_application_1/pages/loan_reports_page.dart';
 import 'package:flutter_application_1/models/user_profile.dart';
 import 'package:flutter_application_1/pages/profile_page.dart';
 import 'package:flutter_application_1/services/user_profile_local_store.dart';
+
+export 'models/library_models.dart';
 
 void main() {
   runApp(const SipMobileApp());
@@ -331,58 +335,6 @@ class DashboardPage extends StatefulWidget {
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
-}
-
-class Book {
-  const Book({
-    required this.id,
-    required this.title,
-    required this.author,
-    required this.category,
-    required this.copies,
-  });
-
-  final int id;
-  final String title;
-  final String author;
-  final String category;
-  final int copies;
-}
-
-class Member {
-  const Member({
-    required this.id,
-    required this.name,
-    required this.phone,
-    required this.email,
-  });
-
-  final int id;
-  final String name;
-  final String phone;
-  final String email;
-}
-
-class Loan {
-  const Loan({
-    required this.id,
-    required this.bookId,
-    required this.memberId,
-    required this.bookTitle,
-    required this.memberName,
-    required this.borrowedAt,
-    required this.dueAt,
-    this.returnedAt,
-  });
-
-  final int id;
-  final int bookId;
-  final int memberId;
-  final String bookTitle;
-  final String memberName;
-  final DateTime borrowedAt;
-  final DateTime dueAt;
-  final DateTime? returnedAt;
 }
 
 class _DashboardPageState extends State<DashboardPage> {
@@ -756,6 +708,8 @@ class _DashboardPageState extends State<DashboardPage> {
             );
           },
         );
+      case 5:
+        return LoanReportsPage(loans: _loans);
       default:
         return DashboardContent(
           books: _books,
@@ -889,6 +843,11 @@ class _DashboardPageState extends State<DashboardPage> {
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profil',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.assessment_outlined),
+            selectedIcon: Icon(Icons.assessment),
+            label: 'Laporan',
           ),
         ],
       ),
