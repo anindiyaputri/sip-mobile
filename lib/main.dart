@@ -1369,8 +1369,9 @@ class BooksPage extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 19,
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primaryContainer,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .primaryContainer,
                           child: Icon(
                             Icons.menu_book_rounded,
                             size: 21,
@@ -1413,7 +1414,9 @@ class BooksPage extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 12,
                                     height: 1.25,
-                                    color: Theme.of(context).colorScheme.primary,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -1441,7 +1444,10 @@ class BooksPage extends StatelessWidget {
                           },
                           itemBuilder: (context) => const [
                             PopupMenuItem(value: 'edit', child: Text('Edit')),
-                            PopupMenuItem(value: 'delete', child: Text('Hapus')),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Hapus'),
+                            ),
                           ],
                         ),
                       ],
@@ -1499,24 +1505,107 @@ class MembersPage extends StatelessWidget {
       body: members.isEmpty
           ? const Center(child: Text('Belum ada anggota.'))
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 100),
               itemCount: members.length,
               itemBuilder: (context, index) {
                 final member = members[index];
                 return Card(
-                  child: ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.person)),
-                    title: Text(member.name),
-                    subtitle: Text('${member.phone}\n${member.email}'),
-                    isThreeLine: true,
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (action) {
-                        if (action == 'edit') onEdit(member);
-                        if (action == 'delete') onDelete(member);
-                      },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        PopupMenuItem(value: 'delete', child: Text('Hapus')),
+                  margin: const EdgeInsets.only(bottom: 9),
+                  elevation: 1,
+                  shadowColor: const Color(0x1417233D),
+                  color: Theme.of(context).colorScheme.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: Color(0xFFE8EDF5)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(11, 10, 5, 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 19,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .primaryContainer,
+                          child: Icon(
+                            Icons.person_rounded,
+                            size: 21,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  member.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    height: 1.2,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'ID Anggota: ${member.id}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.25,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  member.phone,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    height: 1.25,
+                                    color: Color(0xFF647087),
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  member.email,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    height: 1.25,
+                                    color: Color(0xFF647087),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          padding: EdgeInsets.zero,
+                          tooltip: 'Tindakan anggota',
+                          onSelected: (action) {
+                            if (action == 'edit') onEdit(member);
+                            if (action == 'delete') onDelete(member);
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(value: 'edit', child: Text('Edit')),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Hapus'),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
