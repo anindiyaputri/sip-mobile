@@ -267,6 +267,13 @@ void main() {
 
       expect(find.text(searches[index].$2), findsOneWidget);
       expect(find.text('Buku tidak ditemukan.'), findsNothing);
+      if (index == 0) {
+        final title = tester.widget<Text>(find.text(searches[index].$2));
+        expect(title.maxLines, 2);
+        expect(title.style?.fontSize, 15);
+        expect(find.text('Tambah Buku'), findsOneWidget);
+        expect(find.byType(FloatingActionButton), findsNothing);
+      }
     }
   });
 

@@ -1340,41 +1340,135 @@ class BooksPage extends StatelessWidget {
           book.category.toLowerCase().contains(query);
     }).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Data Buku')),
+      appBar: AppBar(
+        title: const Text(
+          'Data Buku',
+          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
+        ),
+      ),
       body: filteredBooks.isEmpty
           ? const Center(child: Text('Buku tidak ditemukan.'))
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
               itemCount: filteredBooks.length,
               itemBuilder: (context, index) {
                 final book = filteredBooks[index];
                 return Card(
-                  child: ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.menu_book)),
-                    title: Text(book.title),
-                    subtitle: Text(
-                      '${book.author} • ${book.category}\n'
-                      'Tersedia ${availableCopies(book)} dari ${book.copies}',
-                    ),
-                    isThreeLine: true,
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (action) {
-                        if (action == 'edit') onEdit(book);
-                        if (action == 'delete') onDelete(book);
-                      },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        PopupMenuItem(value: 'delete', child: Text('Hapus')),
+                  margin: const EdgeInsets.only(bottom: 9),
+                  elevation: 1,
+                  shadowColor: const Color(0x1417233D),
+                  color: Theme.of(context).colorScheme.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: Color(0xFFE8EDF5)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(11, 10, 5, 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 19,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primaryContainer,
+                          child: Icon(
+                            Icons.menu_book_rounded,
+                            size: 21,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  book.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    height: 1.2,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  book.author,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    height: 1.25,
+                                    color: Color(0xFF647087),
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  book.category,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.25,
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Tersedia ${availableCopies(book)} dari ${book.copies}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    height: 1.25,
+                                    color: Color(0xFF667085),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          padding: EdgeInsets.zero,
+                          tooltip: 'Tindakan buku',
+                          onSelected: (action) {
+                            if (action == 'edit') onEdit(book);
+                            if (action == 'delete') onDelete(book);
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(value: 'edit', child: Text('Edit')),
+                            PopupMenuItem(value: 'delete', child: Text('Hapus')),
+                          ],
+                        ),
                       ],
                     ),
                   ),
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: onAdd,
-        icon: const Icon(Icons.add),
-        label: const Text('Tambah Buku'),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+          child: FilledButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add, size: 20),
+            label: const Text(
+              'Tambah Buku',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
