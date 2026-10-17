@@ -232,6 +232,93 @@ void main() {
     expect(find.text('Transaksi'), findsOneWidget);
   });
 
+  testWidgets('dashboard shows at most three active loan cards', (
+    WidgetTester tester,
+  ) async {
+    var selectedTab = -1;
+    final loans = [
+      Loan(
+        id: 1,
+        bookId: 1,
+        memberId: 1,
+        bookTitle:
+            'Judul buku panjang untuk memastikan teks mendapat dua baris penuh',
+        memberName: 'Anggota Pertama',
+        borrowedAt: DateTime(2025, 1, 1),
+        dueAt: DateTime(2025, 1, 2),
+      ),
+      Loan(
+        id: 2,
+        bookId: 2,
+        memberId: 2,
+        bookTitle: 'Buku Kedua',
+        memberName: 'Anggota Kedua',
+        borrowedAt: DateTime(2025, 1, 1),
+        dueAt: DateTime(2099, 1, 2),
+      ),
+      Loan(
+        id: 3,
+        bookId: 3,
+        memberId: 3,
+        bookTitle: 'Buku Ketiga',
+        memberName: 'Anggota Ketiga',
+        borrowedAt: DateTime(2025, 1, 1),
+        dueAt: DateTime(2099, 1, 2),
+      ),
+      Loan(
+        id: 4,
+        bookId: 4,
+        memberId: 4,
+        bookTitle: 'Buku Keempat',
+        memberName: 'Anggota Keempat',
+        borrowedAt: DateTime(2025, 1, 1),
+        dueAt: DateTime(2099, 1, 2),
+      ),
+      Loan(
+        id: 5,
+        bookId: 5,
+        memberId: 5,
+        bookTitle: 'Buku yang sudah dikembalikan',
+        memberName: 'Anggota Kelima',
+        borrowedAt: DateTime(2025, 1, 1),
+        dueAt: DateTime(2025, 1, 2),
+        returnedAt: DateTime(2025, 1, 3),
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DashboardContent(
+            books: const [],
+            members: const [],
+            loans: loans,
+            onSelectTab: (index) => selectedTab = index,
+            onSearch: (_) {},
+            onNotification: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(BorrowedBookCard), findsNWidgets(3));
+    expect(find.text('Terlambat'), findsOneWidget);
+    expect(find.text('Buku Keempat'), findsNothing);
+    expect(find.text('Buku yang sudah dikembalikan'), findsNothing);
+    expect(find.text('Anggota Pertama'), findsOneWidget);
+    final title = tester.widget<Text>(
+      find.text(
+        'Judul buku panjang untuk memastikan teks mendapat dua baris penuh',
+      ),
+    );
+    expect(title.maxLines, 2);
+    expect(title.style?.fontSize, 15);
+
+    await tester.ensureVisible(find.text('Lihat Semua'));
+    await tester.tap(find.text('Lihat Semua'));
+    expect(selectedTab, 3);
+  });
+
   testWidgets('book list contains searchable TKJ, RPL, and Multimedia titles', (
     WidgetTester tester,
   ) async {

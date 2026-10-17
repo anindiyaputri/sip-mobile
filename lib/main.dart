@@ -921,6 +921,7 @@ class DashboardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeLoans = loans.where((loan) => loan.returnedAt == null).toList();
+    final today = DateTime.now();
     final totalCopies = books.fold<int>(0, (sum, book) => sum + book.copies);
     return SafeArea(
       child: SingleChildScrollView(
@@ -1078,11 +1079,16 @@ class DashboardContent extends StatelessWidget {
 
             // BUKU SEDANG DIPINJAM
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const Expanded(
                   child: Text(
                     'Buku Sedang Dipinjam',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.2,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 TextButton(
@@ -1096,21 +1102,27 @@ class DashboardContent extends StatelessWidget {
 
             if (activeLoans.isEmpty)
               const Text(
-                'Tidak ada buku yang sedang dipinjam.',
-                style: TextStyle(color: Colors.grey),
+                'Tidak ada buku yang sedang dipinjam saat ini.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.25,
+                  color: Color(0xFF667085),
+                ),
               )
             else
               ...activeLoans
-                  .take(5)
+                  .take(3)
                   .expand(
                     (loan) => [
                       BorrowedBookCard(
                         title: loan.bookTitle,
                         borrower: loan.memberName,
-                        dueDate: _formatDate(loan.dueAt),
-                        status: 'Dipinjam',
+                        dueDate: _formatDashboardDate(loan.dueAt),
+                        status: _isOverdueOn(loan.dueAt, today)
+                            ? 'Terlambat'
+                            : 'Dipinjam',
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 9),
                     ],
                   ),
           ],
@@ -1230,82 +1242,128 @@ class BorrowedBookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+    final statusColor = status == 'Terlambat'
+        ? const Color(0xFFB54708)
+        : Theme.of(context).colorScheme.primary;
+    final statusBackground = status == 'Terlambat'
+        ? const Color(0xFFFFF1E8)
+        : Theme.of(context).colorScheme.primaryContainer;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 1,
+      shadowColor: const Color(0x1417233D),
+      color: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFE8EDF5)),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 50,
-            height: 62,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE9EDFF),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.menu_book, color: Color(0xFF3157D5)),
-          ),
-
-          const SizedBox(width: 14),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-
-                const SizedBox(height: 5),
-
-                Text(
-                  borrower,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  'Batas: $dueDate',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              status,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.green,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 19,
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              child: Icon(
+                Icons.menu_book_rounded,
+                size: 21,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      borrower,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.25,
+                        color: Color(0xFF647087),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Batas pengembalian: $dueDate',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.25,
+                        color: Color(0xFF667085),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusBackground,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.2,
+                          color: statusColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+bool _isOverdueOn(DateTime dueDate, DateTime currentDate) {
+  final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
+  final today = DateTime(currentDate.year, currentDate.month, currentDate.day);
+  return dueDay.isBefore(today);
+}
+
+String _formatDashboardDate(DateTime date) {
+  const monthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
+  ];
+  return '${date.day} ${monthNames[date.month - 1]} ${date.year}';
 }
 
 // =====================================================
