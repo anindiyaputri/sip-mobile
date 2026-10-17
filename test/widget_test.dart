@@ -150,6 +150,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Ambil foto menggunakan kamera'), findsOneWidget);
     expect(find.text('Pilih foto dari galeri'), findsOneWidget);
+    expect(find.text('Pilih foto dari perangkat'), findsOneWidget);
     Navigator.of(tester.element(find.text('Ambil foto menggunakan kamera')))
         .pop();
     await tester.pumpAndSettle();

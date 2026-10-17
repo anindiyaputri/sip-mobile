@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_application_1/models/user_profile.dart';
 import 'package:flutter_application_1/pages/account_settings_page.dart';
 import 'package:flutter_application_1/services/user_profile_photo_store.dart';
+
+enum _ProfilePhotoSource { camera, gallery, device }
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
@@ -54,7 +57,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _changeProfilePhoto() async {
-    final source = await showModalBottomSheet<ImageSource>(
+    final source = await showModalBottomSheet<_ProfilePhotoSource>(
       context: context,
       builder: (context) => SafeArea(
         child: Wrap(
@@ -62,12 +65,20 @@ class _ProfilePageState extends State<ProfilePage> {
             ListTile(
               leading: const Icon(Icons.camera_alt_outlined),
               title: const Text('Ambil foto menggunakan kamera'),
-              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+              onTap: () =>
+                  Navigator.of(context).pop(_ProfilePhotoSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
               title: const Text('Pilih foto dari galeri'),
-              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+              onTap: () =>
+                  Navigator.of(context).pop(_ProfilePhotoSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_open_outlined),
+              title: const Text('Pilih foto dari perangkat'),
+              onTap: () =>
+                  Navigator.of(context).pop(_ProfilePhotoSource.device),
             ),
           ],
         ),
@@ -77,28 +88,35 @@ class _ProfilePageState extends State<ProfilePage> {
 
     setState(() => _isChangingPhoto = true);
     try {
-      final pickedImage = await _imagePicker.pickImage(source: source);
-      if (pickedImage == null || !mounted) return;
+      final sourcePath = switch (source) {
+        _ProfilePhotoSource.camera => (await _imagePicker.pickImage(
+          source: ImageSource.camera,
+        ))?.path,
+        _ProfilePhotoSource.gallery => (await _imagePicker.pickImage(
+          source: ImageSource.gallery,
+        ))?.path,
+        _ProfilePhotoSource.device => await _pickImageFromDevice(),
+      };
+      if (sourcePath == null || !mounted) return;
 
       final persistentPath = await _photoStore.savePickedImage(
         email: userProfile.email,
-        sourcePath: pickedImage.path,
+        sourcePath: sourcePath,
       );
       final updatedProfile = userProfile.withProfilePhoto(persistentPath);
       final saved = await onProfileUpdated(updatedProfile);
       if (!mounted) return;
 
       if (!saved) {
-        _showPhotoMessage(
-          'Foto profil gagal disimpan. Silakan coba lagi.',
-        );
+        _showPhotoMessage('Foto profil gagal disimpan. Silakan coba lagi.');
         return;
       }
       setState(() => _photoPath = persistentPath);
     } on PlatformException catch (error) {
       if (!mounted) return;
       _showPhotoMessage(
-        'Akses kamera atau galeri gagal: ${error.message ?? error.code}',
+        'Akses kamera, galeri, atau file perangkat gagal: '
+        '${error.message ?? error.code}',
       );
     } on FileSystemException catch (error) {
       if (!mounted) return;
@@ -109,6 +127,32 @@ class _ProfilePageState extends State<ProfilePage> {
     } finally {
       if (mounted) setState(() => _isChangingPhoto = false);
     }
+  }
+
+  Future<String?> _pickImageFromDevice() async {
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const [
+        'jpg',
+        'jpeg',
+        'png',
+        'gif',
+        'webp',
+        'bmp',
+        'heic',
+        'heif',
+      ],
+      dialogTitle: 'Pilih foto profil',
+    );
+    if (file == null) return null;
+
+    final path = file.path;
+    if (path == null || path.isEmpty) {
+      throw const FormatException(
+        'Lokasi file foto yang dipilih tidak dapat dibaca.',
+      );
+    }
+    return path;
   }
 
   void _showPhotoMessage(String message) {
@@ -330,9 +374,9 @@ class _ProfileHeader extends StatelessWidget {
                         color: Color(0xFF3157D5),
                       )
                     : Image.file(
-                          key: const Key('profile_photo_image'),
-                          File(photoPath!),
-                          fit: BoxFit.cover,
+                        key: const Key('profile_photo_image'),
+                        File(photoPath!),
+                        fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
                             const Icon(
                               Icons.person_outline,
@@ -371,7 +415,7 @@ class _ProfileHeader extends StatelessWidget {
                 ),
               ),
             ],
-            ),
+          ),
           const SizedBox(height: 14),
           Text(
             name,
