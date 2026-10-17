@@ -232,6 +232,44 @@ void main() {
     expect(find.text('Transaksi'), findsOneWidget);
   });
 
+  testWidgets('book list contains searchable TKJ, RPL, and Multimedia titles', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const SipMobileApp());
+    await tester.enterText(find.byType(TextFormField).at(0), 'admin@email.com');
+    await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+    await tester.tap(find.text('Masuk'));
+    await tester.pumpAndSettle();
+
+    final searches = [
+      (
+        'TKJ',
+        'Dasar-Dasar Teknik Jaringan Komputer dan Telekomunikasi untuk SMK/MAK Kelas X',
+      ),
+      (
+        'RPL',
+        'Dasar-Dasar Pengembangan Perangkat Lunak dan Gim untuk SMK/MAK Kelas X',
+      ),
+      (
+        'Multimedia',
+        'Dasar - dasar Desain Komunikasi Visual untuk SMK/MAK Kelas X Semester 1',
+      ),
+    ];
+
+    for (var index = 0; index < searches.length; index++) {
+      if (index > 0) {
+        await tester.tap(find.text('Beranda').last);
+        await tester.pumpAndSettle();
+      }
+      await tester.enterText(find.byType(TextField).first, searches[index].$1);
+      await tester.tap(find.text('Buku').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text(searches[index].$2), findsOneWidget);
+      expect(find.text('Buku tidak ditemukan.'), findsNothing);
+    }
+  });
+
   testWidgets('menus add books and process loan returns', (
     WidgetTester tester,
   ) async {
@@ -253,6 +291,7 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(3), '2');
     await tester.tap(find.text('Simpan'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Buku Tes'), 240);
     expect(find.text('Buku Tes'), findsOneWidget);
 
     await tester.tap(find.text('Transaksi').last);
