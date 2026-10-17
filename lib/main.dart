@@ -1559,7 +1559,7 @@ class LoansPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Transaksi')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 100),
         children: [
           Row(
             children: [
@@ -1581,25 +1581,7 @@ class LoansPage extends StatelessWidget {
             )
           else
             ...activeLoans.map(
-              (loan) => Card(
-                child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.menu_book)),
-                  title: Text(loan.bookTitle),
-                  subtitle: Text(
-                    '${loan.memberName}\n'
-                    'Batas pengembalian: ${_formatDate(loan.dueAt)}',
-                  ),
-                  isThreeLine: true,
-                  trailing: IconButton(
-                    tooltip: 'Proses pengembalian',
-                    icon: const Icon(
-                      Icons.assignment_turned_in_outlined,
-                      color: Color(0xFF3157D5),
-                    ),
-                    onPressed: () => onReturn(loan),
-                  ),
-                ),
-              ),
+              (loan) => _loanCard(context, loan, isReturned: false),
             ),
           const SizedBox(height: 24),
           Text(
@@ -1613,19 +1595,7 @@ class LoansPage extends StatelessWidget {
             )
           else
             ...returnedLoans.map(
-              (loan) => Card(
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    child: Icon(Icons.assignment_return),
-                  ),
-                  title: Text(loan.bookTitle),
-                  subtitle: Text(
-                    '${loan.memberName}\n'
-                    'Dikembalikan: ${_formatDate(loan.returnedAt!)}',
-                  ),
-                  isThreeLine: true,
-                ),
-              ),
+              (loan) => _loanCard(context, loan, isReturned: true),
             ),
         ],
       ),
@@ -1633,6 +1603,119 @@ class LoansPage extends StatelessWidget {
         onPressed: onAdd,
         icon: const Icon(Icons.add),
         label: const Text('Pinjam Buku'),
+      ),
+    );
+  }
+
+  Widget _loanCard(
+    BuildContext context,
+    Loan loan, {
+    required bool isReturned,
+  }) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 9),
+      elevation: 1,
+      shadowColor: const Color(0x1417233D),
+      color: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFE8EDF5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(11, 10, 5, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 19,
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              child: Icon(
+                isReturned ? Icons.assignment_return : Icons.menu_book_rounded,
+                size: 21,
+                color: primaryColor,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loan.bookTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      loan.memberName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.25,
+                        color: Color(0xFF647087),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Dipinjam: ${_formatDate(loan.borrowedAt)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.25,
+                        color: Color(0xFF667085),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      isReturned
+                          ? 'Dikembalikan: ${_formatDate(loan.returnedAt!)}'
+                          : 'Batas pengembalian: ${_formatDate(loan.dueAt)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.25,
+                        color: Color(0xFF667085),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      isReturned ? 'Status: Dikembalikan' : 'Status: Dipinjam',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.25,
+                        color: primaryColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (!isReturned)
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                tooltip: 'Proses pengembalian',
+                icon: const Icon(
+                  Icons.assignment_turned_in_outlined,
+                  color: Color(0xFF3157D5),
+                ),
+                onPressed: () => onReturn(loan),
+              ),
+          ],
+        ),
       ),
     );
   }
