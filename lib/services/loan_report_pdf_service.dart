@@ -5,9 +5,16 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../models/loan_report.dart';
 import '../models/library_models.dart';
+import 'user_account_store.dart';
 
 class LoanReportPdfService {
-  Future<Uint8List> createPdf(LoanReportSnapshot report) async {
+  Future<Uint8List> createPdf(
+    LoanReportSnapshot report, {
+    required AuthenticatedSession session,
+  }) async {
+    if (session.role != UserRole.admin) {
+      throw StateError('Laporan hanya dapat dibuat oleh Admin.');
+    }
     final document = pw.Document();
     final reportName = report.period == LoanReportPeriod.daily
         ? 'Harian'

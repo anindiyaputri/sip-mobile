@@ -6,7 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:flutter_application_1/models/user_profile.dart';
+import 'package:flutter_application_1/pages/access_denied_page.dart';
 import 'package:flutter_application_1/pages/account_settings_page.dart';
+import 'package:flutter_application_1/services/user_account_store.dart';
 import 'package:flutter_application_1/services/user_profile_photo_store.dart';
 
 enum _ProfilePhotoSource { camera, gallery, device }
@@ -14,11 +16,13 @@ enum _ProfilePhotoSource { camera, gallery, device }
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
     super.key,
+    required this.session,
     required this.userProfile,
     required this.onProfileUpdated,
     required this.onLogout,
   });
 
+  final AuthenticatedSession session;
   final UserProfile userProfile;
   final Future<bool> Function(UserProfile profile) onProfileUpdated;
   final VoidCallback onLogout;
@@ -163,6 +167,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (userProfile.id != widget.session.userId) {
+      return const AccessDeniedPage(
+        message: 'Profil ini bukan milik akun yang sedang digunakan.',
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Profil')),
       body: SafeArea(
@@ -272,6 +281,7 @@ class _ProfilePageState extends State<ProfilePage> {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => AccountSettingsPage(
+          session: widget.session,
           userProfile: userProfile,
           onProfileUpdated: onProfileUpdated,
         ),

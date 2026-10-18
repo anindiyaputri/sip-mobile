@@ -18,45 +18,36 @@ class UserProfileLocalStore {
     final name = decoded['name'];
     final phone = decoded['phone'];
     final photoPath = decoded['photoPath'];
+    final id = decoded['id'];
+    final role = decoded['role'];
     if ((name != null && name is! String) ||
         (phone != null && phone is! String) ||
-        (photoPath != null && photoPath is! String)) {
+        (photoPath != null && photoPath is! String) ||
+        (id != null && id is! String) ||
+        (role != null && role is! String)) {
       throw const FormatException('Data profil lokal memiliki format salah.');
     }
 
     return UserProfile(
       email: email,
+      id: id as String?,
       name: name as String?,
       phone: phone as String?,
       photoPath: photoPath as String?,
+      role: role as String?,
     );
   }
 
   Future<UserProfile> loadForLogin(String email) async {
     final profile = await load(email);
-    final normalizedEmail = email.trim().toLowerCase();
-    final normalizedName = profile.name?.trim().toLowerCase();
-    final shouldInitializeAdminName =
-        normalizedEmail == 'admin@gmail.com' &&
-        (normalizedName == null ||
-            normalizedName.isEmpty ||
-            normalizedName == 'nama belum diisi');
-
-    if (!shouldInitializeAdminName) return profile;
-
-    final adminProfile = UserProfile(
+    return UserProfile(
       id: profile.id,
       email: email.trim(),
-      name: 'Admin',
+      name: profile.name,
       phone: profile.phone,
       photoPath: profile.photoPath,
       role: profile.role,
     );
-    final saved = await save(adminProfile);
-    if (!saved) {
-      throw StateError('Nama Admin gagal disimpan di perangkat ini.');
-    }
-    return adminProfile;
   }
 
   Future<bool> save(UserProfile profile) async {
@@ -67,6 +58,8 @@ class UserProfileLocalStore {
         'name': profile.name,
         'phone': profile.phone,
         'photoPath': profile.photoPath,
+        'id': profile.id,
+        'role': profile.role,
       }),
     );
   }

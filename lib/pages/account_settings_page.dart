@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_application_1/models/user_profile.dart';
+import 'package:flutter_application_1/pages/access_denied_page.dart';
+import 'package:flutter_application_1/services/user_account_store.dart';
 import 'package:flutter_application_1/services/user_profile_local_store.dart';
 
 class AccountSettingsPage extends StatefulWidget {
   const AccountSettingsPage({
     super.key,
+    required this.session,
     required this.userProfile,
     required this.onProfileUpdated,
   });
 
+  final AuthenticatedSession session;
   final UserProfile userProfile;
   final Future<bool> Function(UserProfile profile) onProfileUpdated;
 
@@ -122,6 +126,11 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.userProfile.id != widget.session.userId) {
+      return const AccessDeniedPage(
+        message: 'Pengaturan hanya tersedia untuk pemilik akun.',
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pengaturan Akun'),
@@ -145,9 +154,9 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
               const SizedBox(height: 14),
               _ReadOnlyAccountField(
                 icon: Icons.email_outlined,
-                label: 'Email Login',
+                label: 'Email/Username Login',
                 value: _userProfile.email,
-                helperText: 'Email tidak dapat diubah melalui pengaturan ini.',
+                helperText: 'Identitas login tidak dapat diubah melalui pengaturan ini.',
               ),
               if (_userProfile.role != null &&
                   _userProfile.role!.trim().isNotEmpty) ...[

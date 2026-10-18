@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/models/library_models.dart';
+import 'package:flutter_application_1/pages/access_denied_page.dart';
 import 'package:flutter_application_1/pages/loan_reports_page.dart';
 import 'package:flutter_application_1/models/user_profile.dart';
+import 'package:flutter_application_1/pages/user_accounts_page.dart';
 import 'package:flutter_application_1/pages/profile_page.dart';
+import 'package:flutter_application_1/services/user_account_store.dart';
 import 'package:flutter_application_1/services/user_profile_local_store.dart';
 
 export 'models/library_models.dart';
@@ -12,7 +15,12 @@ void main() {
 }
 
 class SipMobileApp extends StatelessWidget {
-  const SipMobileApp({super.key});
+  const SipMobileApp({
+    super.key,
+    this.accountStore = const UserAccountStore(),
+  });
+
+  final UserAccountStore accountStore;
 
   @override
   Widget build(BuildContext context) {
@@ -25,13 +33,18 @@ class SipMobileApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF7F8FC),
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3157D5)),
       ),
-      home: const LoginPage(),
+      home: LoginPage(accountStore: accountStore),
     );
   }
 }
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({
+    super.key,
+    this.accountStore = const UserAccountStore(),
+  });
+
+  final UserAccountStore accountStore;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -41,9 +54,29 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  late final _accountStore = widget.accountStore;
   final _profileStore = UserProfileLocalStore();
   bool _obscurePassword = true;
   bool _isSigningIn = false;
+  bool? _hasAccounts;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshAccountStatus();
+  }
+
+  Future<void> _refreshAccountStatus() async {
+    try {
+      final hasAccounts = await _accountStore.hasAccounts();
+      if (mounted) setState(() => _hasAccounts = hasAccounts);
+    } on Exception catch (error) {
+      if (mounted) {
+        setState(() => _hasAccounts = true);
+        _showLoginError('Data akun lokal gagal dibaca: $error');
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -55,27 +88,79 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _signIn() async {
     if (_isSigningIn || !_formKey.currentState!.validate()) return;
 
-    final email = _emailController.text.trim();
+    final login = _emailController.text.trim();
     setState(() => _isSigningIn = true);
     try {
-      final userProfile = await _profileStore.loadForLogin(email);
+      final session = await _accountStore.authenticate(
+        login,
+        _passwordController.text,
+      );
+      final storedProfile = await _profileStore.loadForLogin(session.login);
+      final userProfile = UserProfile(
+        id: session.userId,
+        email: session.login,
+        name: storedProfile.name,
+        phone: storedProfile.phone,
+        photoPath: storedProfile.photoPath,
+        role: session.role.label,
+      );
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => DashboardPage(userProfile: userProfile),
+          builder: (_) => DashboardPage(
+            session: session,
+            userProfile: userProfile,
+            accountStore: _accountStore,
+          ),
         ),
       );
+    } on FormatException catch (error) {
+      if (!mounted) return;
+      _showLoginError(error.message);
     } on Exception catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text('Data profil lokal gagal dimuat: $error')),
-        );
+      _showLoginError(
+        'Login gagal karena data lokal tidak dapat dibaca: $error',
+      );
     } finally {
       if (mounted) setState(() => _isSigningIn = false);
     }
+  }
+
+  Future<void> _createInitialAdmin() async {
+    final details = await showDialog<_InitialAdminDetails>(
+      context: context,
+      builder: (_) => const _InitialAdminDialog(),
+    );
+    if (!mounted || details == null) return;
+
+    try {
+      final account = await _accountStore.createInitialAdmin(
+        login: details.login,
+        password: details.password,
+      );
+      final saved = await _profileStore.save(
+        UserProfile(
+          id: account.id,
+          email: account.login,
+          name: details.name,
+          role: account.role.label,
+        ),
+      );
+      if (!saved) throw StateError('Profil Admin gagal disimpan.');
+      if (!mounted) return;
+      setState(() => _hasAccounts = true);
+      _showLoginError('Akun Admin berhasil dibuat. Silakan masuk.');
+    } on Exception catch (error) {
+      if (mounted) _showLoginError('Akun Admin gagal dibuat: $error');
+    }
+  }
+
+  void _showLoginError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -111,27 +196,29 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         const SizedBox(width: 14),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'SIP Mobile',
-                              style: TextStyle(
-                                color: Color(0xFF17233D),
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.3,
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'SIP Mobile',
+                                style: TextStyle(
+                                  color: Color(0xFF17233D),
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.3,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 3),
-                            Text(
-                              'Sistem Informasi Perpustakaan',
-                              style: TextStyle(
-                                color: Color(0xFF77839A),
-                                fontSize: 12,
+                              SizedBox(height: 3),
+                              Text(
+                                'Sistem Informasi Perpustakaan',
+                                style: TextStyle(
+                                  color: Color(0xFF77839A),
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -179,17 +266,16 @@ class _LoginPageState extends State<LoginPage> {
                         children: [
                           TextFormField(
                             controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
+                            keyboardType: TextInputType.text,
                             textInputAction: TextInputAction.next,
                             decoration: _loginInputDecoration(
-                              label: 'Email',
-                              hint: 'nama@email.com',
+                              label: 'Email atau username',
+                              hint: 'nama@email.com atau username',
                               icon: Icons.email_outlined,
                             ),
                             validator: (value) {
-                              final email = value?.trim() ?? '';
-                              if (email.isEmpty || !email.contains('@')) {
-                                return 'Masukkan alamat email yang valid';
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Email atau username wajib diisi';
                               }
                               return null;
                             },
@@ -258,6 +344,12 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   if (!isKeyboardVisible) ...[
                     const SizedBox(height: 20),
+                    if (_hasAccounts == false)
+                      TextButton.icon(
+                        onPressed: _isSigningIn ? null : _createInitialAdmin,
+                        icon: const Icon(Icons.admin_panel_settings_outlined),
+                        label: const Text('Buat akun Admin pertama'),
+                      ),
                     const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -328,10 +420,125 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key, required this.userProfile});
+class _InitialAdminDetails {
+  const _InitialAdminDetails({
+    required this.name,
+    required this.login,
+    required this.password,
+  });
 
+  final String name;
+  final String login;
+  final String password;
+}
+
+class _InitialAdminDialog extends StatefulWidget {
+  const _InitialAdminDialog();
+
+  @override
+  State<_InitialAdminDialog> createState() => _InitialAdminDialogState();
+}
+
+class _InitialAdminDialogState extends State<_InitialAdminDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _loginController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _loginController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Buat akun Admin pertama'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Nama'),
+                validator: _requiredField,
+              ),
+              TextFormField(
+                controller: _loginController,
+                decoration: const InputDecoration(
+                  labelText: 'Email atau username',
+                ),
+                validator: _requiredField,
+              ),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Kata sandi (minimal 8 karakter)',
+                ),
+                validator: (value) => (value?.length ?? 0) < 8
+                    ? 'Kata sandi harus terdiri dari minimal 8 karakter.'
+                    : null,
+              ),
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Ulangi kata sandi',
+                ),
+                validator: (value) => value != _passwordController.text
+                    ? 'Kata sandi tidak sama.'
+                    : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (!_formKey.currentState!.validate()) return;
+            Navigator.pop(
+              context,
+              _InitialAdminDetails(
+                name: _nameController.text.trim(),
+                login: _loginController.text.trim(),
+                password: _passwordController.text,
+              ),
+            );
+          },
+          child: const Text('Buat Admin'),
+        ),
+      ],
+    );
+  }
+
+  String? _requiredField(String? value) =>
+      value == null || value.trim().isEmpty ? 'Wajib diisi.' : null;
+}
+
+class DashboardPage extends StatefulWidget {
+  const DashboardPage({
+    super.key,
+    required this.session,
+    required this.userProfile,
+    required this.accountStore,
+  });
+
+  final AuthenticatedSession session;
   final UserProfile userProfile;
+  final UserAccountStore accountStore;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -341,6 +548,8 @@ class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
   String _bookSearch = '';
   late UserProfile _userProfile;
+  late AuthenticatedSession _session;
+  late final UserAccountStore _accountStore;
   final _profileStore = UserProfileLocalStore();
   int _nextBookId = 32;
   int _nextMemberId = 3;
@@ -606,13 +815,49 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _userProfile = widget.userProfile;
+    _session = widget.session;
+    _accountStore = widget.accountStore;
   }
 
+  bool get _isAdmin => _session.role == UserRole.admin;
+
   Future<bool> _saveProfile(UserProfile profile) async {
-    final saved = await _profileStore.save(profile);
+    if (profile.id != _session.userId) {
+      _showMessage('Profil hanya dapat diubah oleh pemilik akun.');
+      return false;
+    }
+    final saved = await _profileStore.save(
+      UserProfile(
+        id: _session.userId,
+        email: _session.login,
+        name: profile.name,
+        phone: profile.phone,
+        photoPath: profile.photoPath,
+        role: _session.role.label,
+      ),
+    );
     if (!saved || !mounted) return saved;
-    setState(() => _userProfile = profile);
+    setState(
+      () => _userProfile = UserProfile(
+        id: _session.userId,
+        email: _session.login,
+        name: profile.name,
+        phone: profile.phone,
+        photoPath: profile.photoPath,
+        role: _session.role.label,
+      ),
+    );
     return true;
+  }
+
+  List<Loan> get _visibleLoans {
+    if (_isAdmin) return _loans;
+    return _loans.where((loan) {
+      if (loan.ownerUserId != null) {
+        return loan.ownerUserId == _session.userId;
+      }
+      return _session.memberId != null && loan.memberId == _session.memberId;
+    }).toList();
   }
 
   int _activeLoansForBook(int bookId) => _loans
@@ -628,6 +873,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _addLoan() async {
+    if (!_isAdmin) {
+      _showMessage('Hanya Admin yang dapat mencatat peminjaman.');
+      return;
+    }
     final availableBooks = _books
         .where((book) => _availableCopies(book) > 0)
         .toList();
@@ -642,6 +891,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final loan = await _showLoanForm(context, availableBooks, _members);
     if (!mounted || loan == null) return;
+    final ownerUserId = await _accountStore.userIdForMember(loan.memberId);
+    if (!mounted) return;
     setState(() {
       _loans.add(
         Loan(
@@ -652,12 +903,17 @@ class _DashboardPageState extends State<DashboardPage> {
           memberName: loan.memberName,
           borrowedAt: loan.borrowedAt,
           dueAt: loan.dueAt,
+          ownerUserId: ownerUserId,
         ),
       );
     });
   }
 
   void _returnLoan(Loan loan) {
+    if (!_isAdmin) {
+      _showMessage('Hanya Admin yang dapat memproses pengembalian.');
+      return;
+    }
     setState(() {
       final index = _loans.indexWhere((item) => item.id == loan.id);
       if (index != -1) {
@@ -671,6 +927,7 @@ class _DashboardPageState extends State<DashboardPage> {
           borrowedAt: current.borrowedAt,
           dueAt: current.dueAt,
           returnedAt: DateTime.now(),
+          ownerUserId: current.ownerUserId,
         );
       }
     });
@@ -678,55 +935,104 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildCurrentPage() {
-    switch (_selectedIndex) {
-      case 1:
-        return BooksPage(
-          books: _books,
-          availableCopies: _availableCopies,
-          searchQuery: _bookSearch,
-          onAdd: _addBook,
-          onEdit: _editBook,
-          onDelete: _deleteBook,
-        );
-      case 2:
-        return MembersPage(
-          members: _members,
-          onAdd: _addMember,
-          onEdit: _editMember,
-          onDelete: _deleteMember,
-        );
-      case 3:
-        return LoansPage(loans: _loans, onAdd: _addLoan, onReturn: _returnLoan);
-      case 5:
-        return ProfilePage(
-          userProfile: _userProfile,
-          onProfileUpdated: _saveProfile,
-          onLogout: () {
-            Navigator.of(context).pushAndRemoveUntil<void>(
-              MaterialPageRoute<void>(builder: (_) => const LoginPage()),
-              (route) => false,
-            );
-          },
-        );
-      case 4:
-        return LoanReportsPage(loans: _loans);
-      default:
-        return DashboardContent(
-          books: _books,
-          members: _members,
-          loans: _loans,
-          onSelectTab: _selectTab,
-          onSearch: (query) => setState(() => _bookSearch = query),
-          onNotification: () => _showMessage('Belum ada notifikasi baru.'),
-        );
+    if (_isAdmin) {
+      switch (_selectedIndex) {
+        case 1:
+          return BooksPage(
+            session: _session,
+            books: _books,
+            availableCopies: _availableCopies,
+            searchQuery: _bookSearch,
+            onAdd: _addBook,
+            onEdit: _editBook,
+            onDelete: _deleteBook,
+          );
+        case 2:
+          return MembersPage(
+            session: _session,
+            members: _members,
+            onAdd: _addMember,
+            onEdit: _editMember,
+            onDelete: _deleteMember,
+          );
+        case 3:
+          return LoansPage(
+            session: _session,
+            loans: _visibleLoans,
+            onAdd: _addLoan,
+            onReturn: _returnLoan,
+          );
+        case 4:
+          return LoanReportsPage(session: _session, loans: _loans);
+        case 5:
+          return _buildProfilePage();
+        case 6:
+          return UserAccountsPage(
+            session: _session,
+            members: _members,
+            accountStore: _accountStore,
+          );
+      }
+    } else {
+      switch (_selectedIndex) {
+        case 1:
+          return BooksPage(
+            session: _session,
+            books: _books,
+            availableCopies: _availableCopies,
+            searchQuery: _bookSearch,
+          );
+        case 2:
+          return LoansPage(
+            session: _session,
+            loans: _visibleLoans,
+            onAdd: _addLoan,
+            onReturn: _returnLoan,
+          );
+        case 3:
+          return _buildProfilePage();
+      }
     }
+    return DashboardContent(
+      books: _books,
+      members: _isAdmin ? _members : const [],
+      loans: _visibleLoans,
+      isAdmin: _isAdmin,
+      loansTabIndex: _isAdmin ? 3 : 2,
+      onManageUsers: _isAdmin ? () => setState(() => _selectedIndex = 6) : null,
+      onSelectTab: _selectTab,
+      onSearch: (query) => setState(() => _bookSearch = query),
+      onNotification: () => _showMessage('Belum ada notifikasi baru.'),
+    );
+  }
+
+  Widget _buildProfilePage() {
+    return ProfilePage(
+      session: _session,
+      userProfile: _userProfile,
+      onProfileUpdated: _saveProfile,
+      onLogout: () {
+        Navigator.of(context).pushAndRemoveUntil<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => LoginPage(accountStore: _accountStore),
+          ),
+          (route) => false,
+        );
+      },
+    );
   }
 
   void _selectTab(int index) {
+    final tabCount = _isAdmin ? 6 : 4;
+    if (index < 0 || index >= tabCount) return;
     setState(() => _selectedIndex = index);
   }
 
   Future<void> _addBook() async {
+    if (!_isAdmin) {
+      _showMessage('Hanya Admin yang dapat mengelola buku.');
+      return;
+    }
     final book = await _showBookForm(context);
     if (!mounted || book == null) return;
     setState(() {
@@ -743,6 +1049,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _editBook(Book existing) async {
+    if (!_isAdmin) {
+      _showMessage('Hanya Admin yang dapat mengelola buku.');
+      return;
+    }
     final updated = await _showBookForm(context, existing: existing);
     if (!mounted || updated == null) return;
     setState(() {
@@ -762,6 +1072,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _deleteBook(Book book) {
+    if (!_isAdmin) {
+      _showMessage('Hanya Admin yang dapat mengelola buku.');
+      return;
+    }
     if (_activeLoansForBook(book.id) > 0) {
       _showMessage('Buku yang masih dipinjam tidak dapat dihapus.');
       return;
@@ -770,6 +1084,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _addMember() async {
+    if (!_isAdmin) {
+      _showMessage('Hanya Admin yang dapat mengelola anggota.');
+      return;
+    }
     final member = await _showMemberForm(context);
     if (!mounted || member == null) return;
     setState(() {
@@ -785,6 +1103,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _editMember(Member existing) async {
+    if (!_isAdmin) {
+      _showMessage('Hanya Admin yang dapat mengelola anggota.');
+      return;
+    }
     final updated = await _showMemberForm(context, existing: existing);
     if (!mounted || updated == null) return;
     setState(() {
@@ -800,7 +1122,18 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  void _deleteMember(Member member) {
+  void _deleteMember(Member member) async {
+    if (!_isAdmin) {
+      _showMessage('Hanya Admin yang dapat mengelola anggota.');
+      return;
+    }
+    if (await _accountStore.userIdForMember(member.id) != null) {
+      _showMessage(
+        'Anggota yang ditautkan ke akun pengguna tidak dapat dihapus.',
+      );
+      return;
+    }
+    if (!mounted) return;
     final hasActiveLoan = _loans.any(
       (loan) => loan.memberId == member.id && loan.returnedAt == null,
     );
@@ -814,30 +1147,61 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    const destinations = [
-      (icon: Icons.home_outlined, selectedIcon: Icons.home, label: 'Beranda'),
-      (
-        icon: Icons.menu_book_outlined,
-        selectedIcon: Icons.menu_book,
-        label: 'Buku',
-      ),
-      (
-        icon: Icons.people_outline,
-        selectedIcon: Icons.people,
-        label: 'Anggota',
-      ),
-      (
-        icon: Icons.swap_horiz,
-        selectedIcon: Icons.swap_horiz,
-        label: 'Transaksi',
-      ),
-      (
-        icon: Icons.assessment_outlined,
-        selectedIcon: Icons.assessment,
-        label: 'Laporan',
-      ),
-      (icon: Icons.person_outline, selectedIcon: Icons.person, label: 'Profil'),
-    ];
+    final destinations = _isAdmin
+        ? const [
+            (
+              icon: Icons.home_outlined,
+              selectedIcon: Icons.home,
+              label: 'Beranda',
+            ),
+            (
+              icon: Icons.menu_book_outlined,
+              selectedIcon: Icons.menu_book,
+              label: 'Buku',
+            ),
+            (
+              icon: Icons.people_outline,
+              selectedIcon: Icons.people,
+              label: 'Anggota',
+            ),
+            (
+              icon: Icons.swap_horiz,
+              selectedIcon: Icons.swap_horiz,
+              label: 'Transaksi',
+            ),
+            (
+              icon: Icons.assessment_outlined,
+              selectedIcon: Icons.assessment,
+              label: 'Laporan',
+            ),
+            (
+              icon: Icons.person_outline,
+              selectedIcon: Icons.person,
+              label: 'Profil',
+            ),
+          ]
+        : const [
+            (
+              icon: Icons.home_outlined,
+              selectedIcon: Icons.home,
+              label: 'Beranda',
+            ),
+            (
+              icon: Icons.menu_book_outlined,
+              selectedIcon: Icons.menu_book,
+              label: 'Buku',
+            ),
+            (
+              icon: Icons.history,
+              selectedIcon: Icons.history,
+              label: 'Riwayat',
+            ),
+            (
+              icon: Icons.person_outline,
+              selectedIcon: Icons.person,
+              label: 'Profil',
+            ),
+          ];
 
     return Scaffold(
       body: _buildCurrentPage(),
@@ -943,6 +1307,9 @@ class DashboardContent extends StatelessWidget {
     required this.books,
     required this.members,
     required this.loans,
+    required this.isAdmin,
+    required this.loansTabIndex,
+    this.onManageUsers,
     required this.onSelectTab,
     required this.onSearch,
     required this.onNotification,
@@ -951,6 +1318,9 @@ class DashboardContent extends StatelessWidget {
   final List<Book> books;
   final List<Member> members;
   final List<Loan> loans;
+  final bool isAdmin;
+  final int loansTabIndex;
+  final VoidCallback? onManageUsers;
   final ValueChanged<int> onSelectTab;
   final ValueChanged<String> onSearch;
   final VoidCallback onNotification;
@@ -1081,36 +1451,51 @@ class DashboardContent extends StatelessWidget {
                 SizedBox(width: 12),
                 Expanded(
                   child: StatisticCard(
-                    icon: Icons.people,
-                    title: 'Anggota',
-                    value: '${members.length}',
+                    icon: isAdmin ? Icons.people : Icons.bookmark,
+                    title: isAdmin ? 'Anggota' : 'Peminjaman Saya',
+                    value: isAdmin
+                        ? '${members.length}'
+                        : '${loans.where((loan) => loan.returnedAt == null).length}',
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 12),
+            if (isAdmin) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: StatisticCard(
+                      icon: Icons.bookmark,
+                      title: 'Dipinjam',
+                      value: '${activeLoans.length}',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: StatisticCard(
+                      icon: Icons.assignment_return,
+                      title: 'Kembali',
+                      value:
+                          '${loans.where((loan) => loan.returnedAt != null).length}',
+                    ),
+                  ),
+                ],
+              ),
+            ],
 
-            Row(
-              children: [
-                Expanded(
-                  child: StatisticCard(
-                    icon: Icons.bookmark,
-                    title: 'Dipinjam',
-                    value: '${activeLoans.length}',
-                  ),
+            if (isAdmin && onManageUsers != null) ...[
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onManageUsers,
+                  icon: const Icon(Icons.manage_accounts_outlined),
+                  label: const Text('Kelola Akun Pengguna'),
                 ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: StatisticCard(
-                    icon: Icons.assignment_return,
-                    title: 'Kembali',
-                    value:
-                        '${loans.where((loan) => loan.returnedAt != null).length}',
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
 
             const SizedBox(height: 26),
 
@@ -1129,7 +1514,7 @@ class DashboardContent extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => onSelectTab(3),
+                  onPressed: () => onSelectTab(loansTabIndex),
                   child: const Text('Lihat Semua'),
                 ),
               ],
@@ -1410,20 +1795,22 @@ String _formatDashboardDate(DateTime date) {
 class BooksPage extends StatelessWidget {
   const BooksPage({
     super.key,
+    required this.session,
     required this.books,
     required this.availableCopies,
     required this.searchQuery,
-    required this.onAdd,
-    required this.onEdit,
-    required this.onDelete,
+    this.onAdd,
+    this.onEdit,
+    this.onDelete,
   });
 
+  final AuthenticatedSession session;
   final List<Book> books;
   final int Function(Book) availableCopies;
   final String searchQuery;
-  final VoidCallback onAdd;
-  final ValueChanged<Book> onEdit;
-  final ValueChanged<Book> onDelete;
+  final VoidCallback? onAdd;
+  final ValueChanged<Book>? onEdit;
+  final ValueChanged<Book>? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1457,117 +1844,152 @@ class BooksPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                     side: const BorderSide(color: Color(0xFFE8EDF5)),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(11, 10, 5, 10),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CircleAvatar(
-                          radius: 19,
-                          backgroundColor: Theme.of(context)
-                              .colorScheme
-                              .primaryContainer,
-                          child: Icon(
-                            Icons.menu_book_rounded,
-                            size: 21,
-                            color: Theme.of(context).colorScheme.primary,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () =>
+                        _showBookDetails(context, book, availableCopies(book)),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(11, 10, 5, 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 19,
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .primaryContainer,
+                            child: Icon(
+                              Icons.menu_book_rounded,
+                              size: 21,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 1),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  book.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    height: 1.2,
-                                    fontWeight: FontWeight.w600,
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 1),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    book.title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      height: 1.2,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    book.author,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      height: 1.25,
+                                      color: Color(0xFF647087),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    book.category,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      height: 1.25,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Tersedia ${availableCopies(book)} dari ${book.copies}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      height: 1.25,
+                                      color: Color(0xFF667085),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (session.role == UserRole.admin)
+                            PopupMenuButton<String>(
+                              padding: EdgeInsets.zero,
+                              tooltip: 'Tindakan buku',
+                              onSelected: (action) {
+                                if (action == 'edit') onEdit?.call(book);
+                                if (action == 'delete') onDelete?.call(book);
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('Edit'),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  book.author,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    height: 1.25,
-                                    color: Color(0xFF647087),
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  book.category,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.25,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Tersedia ${availableCopies(book)} dari ${book.copies}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    height: 1.25,
-                                    color: Color(0xFF667085),
-                                  ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('Hapus'),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                        PopupMenuButton<String>(
-                          padding: EdgeInsets.zero,
-                          tooltip: 'Tindakan buku',
-                          onSelected: (action) {
-                            if (action == 'edit') onEdit(book);
-                            if (action == 'delete') onDelete(book);
-                          },
-                          itemBuilder: (context) => const [
-                            PopupMenuItem(value: 'edit', child: Text('Edit')),
-                            PopupMenuItem(
-                              value: 'delete',
-                              child: Text('Hapus'),
-                            ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );
               },
             ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-          child: FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add, size: 20),
-            label: const Text(
-              'Tambah Buku',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-            ),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(46),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+      bottomNavigationBar: session.role == UserRole.admin
+          ? SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+                child: FilledButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add, size: 20),
+                  label: const Text(
+                    'Tambah Buku',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
               ),
-            ),
+            )
+          : null,
+    );
+  }
+
+  void _showBookDetails(BuildContext context, Book book, int available) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(book.title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              Text('Pengarang: ${book.author}'),
+              const SizedBox(height: 6),
+              Text('Kategori: ${book.category}'),
+              const SizedBox(height: 6),
+              Text('Tersedia: $available dari ${book.copies}'),
+            ],
           ),
         ),
       ),
@@ -1582,12 +2004,14 @@ class BooksPage extends StatelessWidget {
 class MembersPage extends StatelessWidget {
   const MembersPage({
     super.key,
+    required this.session,
     required this.members,
     required this.onAdd,
     required this.onEdit,
     required this.onDelete,
   });
 
+  final AuthenticatedSession session;
   final List<Member> members;
   final VoidCallback onAdd;
   final ValueChanged<Member> onEdit;
@@ -1595,6 +2019,7 @@ class MembersPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (session.role != UserRole.admin) return const AccessDeniedPage();
     return Scaffold(
       appBar: AppBar(title: const Text('Data Anggota')),
       body: members.isEmpty
@@ -1723,25 +2148,41 @@ class MembersPage extends StatelessWidget {
 class LoansPage extends StatelessWidget {
   const LoansPage({
     super.key,
+    required this.session,
     required this.loans,
     required this.onAdd,
     required this.onReturn,
   });
 
+  final AuthenticatedSession session;
   final List<Loan> loans;
   final VoidCallback onAdd;
   final ValueChanged<Loan> onReturn;
 
   @override
   Widget build(BuildContext context) {
-    final activeLoans = loans.where((loan) => loan.returnedAt == null).toList();
-    final returnedLoans = loans
+    final visibleLoans = session.role == UserRole.admin
+        ? loans
+        : loans
+              .where(
+                (loan) =>
+                    loan.ownerUserId == session.userId ||
+                    (loan.ownerUserId == null &&
+                        session.memberId != null &&
+                        loan.memberId == session.memberId),
+              )
+              .toList();
+    final isAdmin = session.role == UserRole.admin;
+    final activeLoans = visibleLoans
+        .where((loan) => loan.returnedAt == null)
+        .toList();
+    final returnedLoans = visibleLoans
         .where((loan) => loan.returnedAt != null)
         .toList()
         .reversed
         .toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Transaksi')),
+      appBar: AppBar(title: Text(isAdmin ? 'Transaksi' : 'Riwayat Peminjaman')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(14, 8, 14, 100),
         children: [
@@ -1783,11 +2224,13 @@ class LoansPage extends StatelessWidget {
             ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: onAdd,
-        icon: const Icon(Icons.add),
-        label: const Text('Pinjam Buku'),
-      ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton.extended(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add),
+              label: const Text('Pinjam Buku'),
+            )
+          : null,
     );
   }
 
@@ -1887,7 +2330,7 @@ class LoansPage extends StatelessWidget {
                 ),
               ),
             ),
-            if (!isReturned)
+            if (!isReturned && session.role == UserRole.admin)
               IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 40, minHeight: 40),

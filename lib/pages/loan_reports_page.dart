@@ -4,11 +4,18 @@ import 'package:printing/printing.dart';
 
 import '../models/library_models.dart';
 import '../models/loan_report.dart';
+import 'access_denied_page.dart';
 import '../services/loan_report_pdf_service.dart';
+import '../services/user_account_store.dart';
 
 class LoanReportsPage extends StatefulWidget {
-  const LoanReportsPage({super.key, required this.loans});
+  const LoanReportsPage({
+    super.key,
+    required this.session,
+    required this.loans,
+  });
 
+  final AuthenticatedSession session;
   final List<Loan> loans;
 
   @override
@@ -122,7 +129,10 @@ class _LoanReportsPageState extends State<LoanReportsPage> {
     setState(() => _isExporting = true);
     try {
       final report = _buildReport();
-      final bytes = await _pdfService.createPdf(report);
+      final bytes = await _pdfService.createPdf(
+        report,
+        session: widget.session,
+      );
       final filename = _fileName(report);
       if (share) {
         await Printing.sharePdf(
@@ -169,6 +179,9 @@ class _LoanReportsPageState extends State<LoanReportsPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.session.role != UserRole.admin) {
+      return const AccessDeniedPage();
+    }
     final report = _buildReport();
     return Scaffold(
       appBar: AppBar(

@@ -8,8 +8,20 @@ import 'package:flutter_application_1/models/loan_report.dart';
 import 'package:flutter_application_1/models/user_profile.dart';
 import 'package:flutter_application_1/pages/loan_reports_page.dart';
 import 'package:flutter_application_1/services/loan_report_pdf_service.dart';
+import 'package:flutter_application_1/services/user_account_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  Future<AuthenticatedSession> createAdminSession() async {
+    SharedPreferences.setMockInitialValues({});
+    final accounts = const UserAccountStore(useIsolates: false);
+    final admin = await accounts.createInitialAdmin(
+      login: 'admin@email.com',
+      password: 'password123',
+    );
+    return accounts.authenticate(admin.login, 'password123');
+  }
+
   final loans = [
     Loan(
       id: 1,
@@ -94,6 +106,7 @@ void main() {
   });
 
   test('PDF is generated for populated and empty reports', () async {
+    final adminSession = await createAdminSession();
     final service = LoanReportPdfService();
     final populated = await service.createPdf(
       LoanReportSnapshot(
@@ -103,6 +116,7 @@ void main() {
         status: LoanReportStatus.all,
         asOf: DateTime(2025, 2, 19),
       ),
+      session: adminSession,
     );
     final empty = await service.createPdf(
       LoanReportSnapshot(
@@ -112,6 +126,7 @@ void main() {
         status: LoanReportStatus.all,
         asOf: DateTime(2025, 3, 4),
       ),
+      session: adminSession,
     );
 
     expect(utf8.decode(populated.take(5).toList()), '%PDF-');
@@ -121,6 +136,7 @@ void main() {
   });
 
   test('PDF generation handles a multi-page transaction table', () async {
+    final adminSession = await createAdminSession();
     final manyLoans = List.generate(
       80,
       (index) => Loan(
@@ -141,17 +157,56 @@ void main() {
         status: LoanReportStatus.all,
         asOf: DateTime(2025, 3, 10),
       ),
+      session: adminSession,
     );
 
     expect(utf8.decode(bytes.take(5).toList()), '%PDF-');
     expect(bytes.length, greaterThan(5000));
   });
 
+  test('only Admin sessions can generate PDF reports', () async {
+    final admin = await createAdminSession();
+    final accounts = const UserAccountStore(useIsolates: false);
+    final teacher = await accounts.createAccount(
+      session: admin,
+      login: 'guru.report',
+      password: 'teacher-pass-123',
+      role: UserRole.guru,
+    );
+    final student = await accounts.createAccount(
+      session: admin,
+      login: 'siswa.report',
+      password: 'student-pass-123',
+      role: UserRole.siswa,
+    );
+    final report = LoanReportSnapshot(
+      loans: loans,
+      period: LoanReportPeriod.monthly,
+      selectedDate: DateTime(2025, 2),
+      status: LoanReportStatus.all,
+    );
+    final service = LoanReportPdfService();
+
+    for (final account in [teacher, student]) {
+      final session = await accounts.authenticate(
+        account.login,
+        account.role == UserRole.guru ? 'teacher-pass-123' : 'student-pass-123',
+      );
+      await expectLater(
+        service.createPdf(report, session: session),
+        throwsStateError,
+      );
+    }
+  });
+
   testWidgets('reports page switches period and opens its date selector', (
     WidgetTester tester,
   ) async {
+    final adminSession = await createAdminSession();
     await tester.pumpWidget(
-      const MaterialApp(home: LoanReportsPage(loans: [])),
+      MaterialApp(
+        home: LoanReportsPage(session: adminSession, loans: const []),
+      ),
     );
 
     expect(find.text('Ringkasan Harian'), findsOneWidget);
@@ -174,9 +229,18 @@ void main() {
   testWidgets('Laporan is available from the main navigation', (
     WidgetTester tester,
   ) async {
+    final adminSession = await createAdminSession();
     await tester.pumpWidget(
-      const MaterialApp(
-        home: DashboardPage(userProfile: UserProfile(email: 'admin@email.com')),
+      MaterialApp(
+        home: DashboardPage(
+          session: adminSession,
+          accountStore: const UserAccountStore(useIsolates: false),
+          userProfile: UserProfile(
+            id: adminSession.userId,
+            email: adminSession.login,
+            role: adminSession.role.label,
+          ),
+        ),
       ),
     );
 

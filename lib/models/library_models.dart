@@ -38,6 +38,7 @@ class Loan {
     required this.borrowedAt,
     required this.dueAt,
     this.returnedAt,
+    this.ownerUserId,
   });
 
   final int id;
@@ -48,6 +49,7 @@ class Loan {
   final DateTime borrowedAt;
   final DateTime dueAt;
   final DateTime? returnedAt;
+  final String? ownerUserId;
 
   int get quantity => 1;
 }

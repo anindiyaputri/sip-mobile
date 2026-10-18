@@ -13,13 +13,63 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_application_1/main.dart';
 import 'package:flutter_application_1/models/user_profile.dart';
+import 'package:flutter_application_1/pages/loan_reports_page.dart';
+import 'package:flutter_application_1/pages/user_accounts_page.dart';
+import 'package:flutter_application_1/services/user_account_store.dart';
 import 'package:flutter_application_1/services/user_profile_photo_store.dart';
 import 'package:flutter_application_1/services/user_profile_local_store.dart';
 
 void main() {
+  late UserAccountStore accountStore;
+  AuthenticatedSession? adminSession;
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    accountStore = const UserAccountStore(useIsolates: false);
+    adminSession = null;
   });
+
+  Future<AuthenticatedSession> ensureTestAdmin() async {
+    if (adminSession != null) return adminSession!;
+    if (!await accountStore.hasAccounts()) {
+      await accountStore.createInitialAdmin(
+        login: 'admin@email.com',
+        password: 'password123',
+      );
+    }
+    adminSession = await accountStore.authenticate(
+      'admin@email.com',
+      'password123',
+    );
+    return adminSession!;
+  }
+
+  Future<UserAccount> createTestAccount(
+    String login,
+    UserRole role, {
+    int? memberId,
+    String? name,
+  }) async {
+    final admin = await ensureTestAdmin();
+    final account = await accountStore.createAccount(
+      session: admin,
+      login: login,
+      password: 'password123',
+      role: role,
+      memberId: memberId,
+    );
+    if (name != null) {
+      await UserProfileLocalStore().save(
+        UserProfile(
+          id: account.id,
+          email: account.login,
+          name: name,
+          role: role.label,
+        ),
+      );
+    }
+    return account;
+  }
 
   test('profile storage normalizes email and isolates accounts', () async {
     final store = UserProfileLocalStore();
@@ -41,34 +91,31 @@ void main() {
     expect(otherAccount.phone, isNull);
   });
 
-  test(
-    'admin login initializes the default name without replacing custom name',
-    () async {
-      final store = UserProfileLocalStore();
+  test('login does not infer profile or role from the login text', () async {
+    final store = UserProfileLocalStore();
 
-      final adminProfile = await store.loadForLogin('  ADMIN@gmail.com ');
-      expect(adminProfile.email, 'ADMIN@gmail.com');
-      expect(adminProfile.name, 'Admin');
-      expect((await store.load('admin@gmail.com')).name, 'Admin');
+    final adminProfile = await store.loadForLogin('  ADMIN@gmail.com ');
+    expect(adminProfile.email, 'ADMIN@gmail.com');
+    expect(adminProfile.name, isNull);
+    expect(adminProfile.role, isNull);
 
-      await store.save(
-        const UserProfile(
-          email: 'admin@gmail.com',
-          name: 'Nama belum diisi',
-          phone: '081234567890',
-        ),
-      );
-      final placeholderProfile = await store.loadForLogin('admin@gmail.com');
-      expect(placeholderProfile.name, 'Admin');
-      expect(placeholderProfile.phone, '081234567890');
+    await store.save(
+      const UserProfile(
+        email: 'admin@gmail.com',
+        name: 'Nama belum diisi',
+        phone: '081234567890',
+      ),
+    );
+    final placeholderProfile = await store.loadForLogin('admin@gmail.com');
+    expect(placeholderProfile.name, 'Nama belum diisi');
+    expect(placeholderProfile.phone, '081234567890');
 
-      await store.save(
-        const UserProfile(email: 'admin@gmail.com', name: 'Nama Pilihan'),
-      );
-      final customizedProfile = await store.loadForLogin('admin@gmail.com');
-      expect(customizedProfile.name, 'Nama Pilihan');
-    },
-  );
+    await store.save(
+      const UserProfile(email: 'admin@gmail.com', name: 'Nama Pilihan'),
+    );
+    final customizedProfile = await store.loadForLogin('admin@gmail.com');
+    expect(customizedProfile.name, 'Nama Pilihan');
+  });
 
   test(
     'profile photo is copied locally and stays with the account profile',
@@ -133,7 +180,8 @@ void main() {
   testWidgets('admin name is saved and shown on profile and account settings', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SipMobileApp());
+    await createTestAccount('admin@gmail.com', UserRole.admin, name: 'Admin');
+    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
     await tester.enterText(
       find.byType(TextFormField).at(0),
       '  ADMIN@gmail.com ',
@@ -144,7 +192,7 @@ void main() {
 
     await tester.tap(find.text('Profil').last);
     await tester.pumpAndSettle();
-    expect(find.text('Admin'), findsNWidgets(2));
+    expect(find.text('Admin'), findsNWidgets(4));
     expect(find.byKey(const Key('profile_photo_button')), findsOneWidget);
     await tester.tap(find.byKey(const Key('profile_photo_button')));
     await tester.pumpAndSettle();
@@ -196,13 +244,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Profil').last);
     await tester.pumpAndSettle();
-    expect(find.text('Admin'), findsNWidgets(2));
+    expect(find.text('Admin'), findsNWidgets(4));
   });
 
   testWidgets('login opens the dashboard after valid input', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SipMobileApp());
+    await ensureTestAdmin();
+    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
 
     expect(find.text('Selamat Datang Kembali'), findsOneWidget);
     expect(find.text('SIP Mobile'), findsOneWidget);
@@ -232,19 +281,72 @@ void main() {
     expect(find.text('Transaksi'), findsOneWidget);
   });
 
+  testWidgets(
+    'first use provisions an Admin and login rejects invalid credentials',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Buat akun Admin pertama'), findsOneWidget);
+      await tester.tap(find.text('Buat akun Admin pertama'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextFormField).at(2),
+        'Petugas Sekolah',
+      );
+      await tester.enterText(
+        find.byType(TextFormField).at(3),
+        'kepala.sekolah',
+      );
+      await tester.enterText(
+        find.byType(TextFormField).at(4),
+        'password-admin',
+      );
+      await tester.enterText(
+        find.byType(TextFormField).at(5),
+        'password-admin',
+      );
+      await tester.tap(find.text('Buat Admin'));
+      await tester.pumpAndSettle();
+
+      final storedAdmin = await accountStore.authenticate(
+        'KEPALA.SEKOLAH',
+        'password-admin',
+      );
+      expect(storedAdmin.role, UserRole.admin);
+      expect(find.text('Buat akun Admin pertama'), findsNothing);
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'unknown.user');
+      await tester.enterText(
+        find.byType(TextFormField).at(1),
+        'wrong-password',
+      );
+      await tester.tap(find.text('Masuk'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Email/username atau kata sandi tidak valid.'),
+        findsOneWidget,
+      );
+      expect(find.text('Beranda'), findsNothing);
+    },
+  );
+
   testWidgets('bottom navigation fits and opens all six pages', (
     WidgetTester tester,
   ) async {
+    await ensureTestAdmin();
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: DashboardPage(userProfile: UserProfile(email: 'admin@email.com')),
-      ),
-    );
+    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+    expect(tester.takeException(), isNull, reason: 'Login screen');
+    await tester.enterText(find.byType(TextFormField).at(0), 'admin@email.com');
+    await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+    await tester.tap(find.text('Masuk'));
+    await tester.pumpAndSettle();
 
     expect(
       tester.getSize(find.byKey(const Key('main_bottom_navigation'))).height,
@@ -268,7 +370,141 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(destination.pageTitle), findsOneWidget);
-      expect(tester.takeException(), isNull);
+      expect(tester.takeException(), isNull, reason: destination.label);
+    }
+
+    await tester.tap(find.text('Beranda').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Kelola Akun Pengguna'));
+    await tester.tap(find.text('Kelola Akun Pengguna'));
+    await tester.pumpAndSettle();
+    expect(find.text('Data User'), findsOneWidget);
+    expect(find.text('Tambah Akun'), findsOneWidget);
+  });
+
+  testWidgets('Guru and Siswa see only their own history and permitted pages', (
+    WidgetTester tester,
+  ) async {
+    final guru = await createTestAccount(
+      'guru@sip.id',
+      UserRole.guru,
+      memberId: 1,
+    );
+    final siswa = await createTestAccount(
+      'siswa@sip.id',
+      UserRole.siswa,
+      memberId: 2,
+    );
+
+    for (final account in [guru, siswa]) {
+      final session = await accountStore.authenticate(
+        account.login,
+        'password123',
+      );
+      await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+      await tester.enterText(find.byType(TextFormField).at(0), account.login);
+      await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+      await tester.tap(find.text('Masuk'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Beranda'), findsOneWidget);
+      expect(find.text('Buku'), findsOneWidget);
+      expect(find.text('Riwayat'), findsOneWidget);
+      expect(find.text('Profil'), findsOneWidget);
+      expect(find.text('Anggota'), findsNothing);
+      expect(find.text('Transaksi'), findsNothing);
+      expect(find.text('Laporan'), findsNothing);
+      expect(find.text('Tambah Buku'), findsNothing);
+
+      await tester.tap(find.text('Riwayat'));
+      await tester.pumpAndSettle();
+      expect(find.text('Riwayat Peminjaman'), findsOneWidget);
+      if (session.memberId == 1) {
+        expect(find.text('Andi Saputra'), findsOneWidget);
+        expect(find.text('Siti Rahma'), findsNothing);
+      } else {
+        expect(find.text('Siti Rahma'), findsOneWidget);
+        expect(find.text('Andi Saputra'), findsNothing);
+      }
+      expect(find.byTooltip('Proses pengembalian'), findsNothing);
+      expect(find.byType(FloatingActionButton), findsNothing);
+
+      final ownLoan = Loan(
+        id: 11,
+        bookId: 11,
+        memberId: 1,
+        bookTitle: 'Transaksi milik sendiri',
+        memberName: account.login,
+        borrowedAt: DateTime(2026, 1, 1),
+        dueAt: DateTime(2026, 1, 8),
+        ownerUserId: session.userId,
+      );
+      final otherLoan = Loan(
+        id: 12,
+        bookId: 12,
+        memberId: 2,
+        bookTitle: 'Transaksi milik pengguna lain',
+        memberName: 'Pengguna lain',
+        borrowedAt: DateTime(2026, 1, 1),
+        dueAt: DateTime(2026, 1, 8),
+        ownerUserId: 'unrelated-user-id',
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LoansPage(
+            session: session,
+            loans: [ownLoan, otherLoan],
+            onAdd: () {},
+            onReturn: (_) {},
+          ),
+        ),
+      );
+      expect(find.text('Transaksi milik sendiri'), findsOneWidget);
+      expect(find.text('Transaksi milik pengguna lain'), findsNothing);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MembersPage(
+            session: session,
+            members: const [
+              Member(id: 1, name: 'Data Privat', phone: '123', email: 'x@y.z'),
+            ],
+            onAdd: () {},
+            onEdit: (_) {},
+            onDelete: (_) {},
+          ),
+        ),
+      );
+      expect(
+        find.text('Akses halaman ini tidak tersedia untuk akun Anda.'),
+        findsOneWidget,
+      );
+      expect(find.text('Data Privat'), findsNothing);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LoanReportsPage(session: session, loans: const []),
+        ),
+      );
+      expect(
+        find.text('Akses halaman ini tidak tersedia untuk akun Anda.'),
+        findsOneWidget,
+      );
+      expect(find.text('Ringkasan Harian'), findsNothing);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: UserAccountsPage(
+            session: session,
+            members: const [],
+            accountStore: accountStore,
+          ),
+        ),
+      );
+      expect(
+        find.text('Akses halaman ini tidak tersedia untuk akun Anda.'),
+        findsOneWidget,
+      );
     }
   });
 
@@ -333,6 +569,8 @@ void main() {
             books: const [],
             members: const [],
             loans: loans,
+            isAdmin: true,
+            loansTabIndex: 3,
             onSelectTab: (index) => selectedTab = index,
             onSearch: (_) {},
             onNotification: () {},
@@ -362,7 +600,8 @@ void main() {
   testWidgets('book list contains searchable TKJ, RPL, and Multimedia titles', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SipMobileApp());
+    await ensureTestAdmin();
+    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
     await tester.enterText(find.byType(TextFormField).at(0), 'admin@email.com');
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
     await tester.tap(find.text('Masuk'));
@@ -407,7 +646,8 @@ void main() {
   testWidgets('menus add books and process loan returns', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SipMobileApp());
+    await ensureTestAdmin();
+    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
     await tester.enterText(find.byType(TextFormField).at(0), 'admin@email.com');
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
     await tester.tap(find.text('Masuk'));
@@ -448,7 +688,8 @@ void main() {
   testWidgets('profile shows entered email and confirms logout', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SipMobileApp());
+    await createTestAccount('petugas@sip.id', UserRole.guru);
+    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
     await tester.enterText(find.byType(TextFormField).at(0), 'petugas@sip.id');
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
     await tester.tap(find.text('Masuk'));
@@ -459,7 +700,7 @@ void main() {
     expect(find.text('Nama belum diisi'), findsNWidgets(2));
     expect(find.text('Nomor telepon belum diisi'), findsOneWidget);
     expect(find.text('petugas@sip.id'), findsNWidgets(2));
-    expect(find.text('Peran pengguna'), findsNothing);
+    expect(find.text('Guru'), findsNWidgets(2));
     await tester.scrollUntilVisible(
       find.byKey(const Key('profile_account_settings')),
       240,
@@ -501,10 +742,12 @@ void main() {
   testWidgets('profile email follows each locally validated login', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const SipMobileApp());
+    await createTestAccount('pertama@sip.id', UserRole.guru, memberId: 1);
+    await createTestAccount('kedua@sip.id', UserRole.siswa, memberId: 2);
+    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
 
-    Future<void> loginWith(String email) async {
-      await tester.enterText(find.byType(TextFormField).at(0), email);
+    Future<void> loginWith(String login) async {
+      await tester.enterText(find.byType(TextFormField).at(0), login);
       await tester.enterText(find.byType(TextFormField).at(1), 'password123');
       await tester.tap(find.text('Masuk'));
       await tester.pumpAndSettle();
@@ -532,10 +775,13 @@ void main() {
     await loginWith('pertama@sip.id');
     await tester.tap(find.text('Buku').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Anggota').last);
+    expect(find.text('Tambah Buku'), findsNothing);
+    expect(find.text('Anggota'), findsNothing);
+    expect(find.text('Laporan'), findsNothing);
+    await tester.tap(find.text('Riwayat').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Transaksi').last);
-    await tester.pumpAndSettle();
+    expect(find.text('Andi Saputra'), findsOneWidget);
+    expect(find.text('Siti Rahma'), findsNothing);
     await tester.tap(find.text('Profil').last);
     await tester.pumpAndSettle();
     expect(find.text('pertama@sip.id'), findsNWidgets(2));
@@ -544,6 +790,8 @@ void main() {
     expect(find.text('Selamat Datang Kembali'), findsOneWidget);
 
     await loginWith('kedua@sip.id');
+    expect(find.text('Guru'), findsNothing);
+    expect(find.text('Laporan'), findsNothing);
     await tester.tap(find.text('Profil').last);
     await tester.pumpAndSettle();
     expect(find.text('kedua@sip.id'), findsNWidgets(2));
@@ -553,7 +801,8 @@ void main() {
   testWidgets(
     'account settings updates profile details and returns to profile page',
     (WidgetTester tester) async {
-      await tester.pumpWidget(const SipMobileApp());
+      await createTestAccount('akun@sip.id', UserRole.siswa);
+      await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
       await tester.enterText(find.byType(TextFormField).at(0), 'akun@sip.id');
       await tester.enterText(find.byType(TextFormField).at(1), 'password123');
       await tester.tap(find.text('Masuk'));
@@ -572,10 +821,10 @@ void main() {
       await tester.tap(find.byKey(const Key('profile_account_settings')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Email Login'), findsOneWidget);
+      expect(find.text('Email/Username Login'), findsOneWidget);
       expect(find.text('akun@sip.id'), findsOneWidget);
       expect(
-        find.text('Email tidak dapat diubah melalui pengaturan ini.'),
+        find.text('Identitas login tidak dapat diubah melalui pengaturan ini.'),
         findsOneWidget,
       );
       expect(find.text('Pengaturan Akun'), findsOneWidget);
@@ -635,6 +884,10 @@ void main() {
         find.byKey(const Key('account_settings_phone_field')),
         '081234567890',
       );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      await tester.drag(find.byType(ListView).last, const Offset(0, -200));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Simpan'));
       await tester.pumpAndSettle();
       expect(
