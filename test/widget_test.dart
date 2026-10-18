@@ -232,6 +232,46 @@ void main() {
     expect(find.text('Transaksi'), findsOneWidget);
   });
 
+  testWidgets('bottom navigation fits and opens all six pages', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: DashboardPage(userProfile: UserProfile(email: 'admin@email.com')),
+      ),
+    );
+
+    expect(
+      tester.getSize(find.byKey(const Key('main_bottom_navigation'))).height,
+      72,
+    );
+
+    const destinations = [
+      (label: 'Beranda', pageTitle: 'Ringkasan'),
+      (label: 'Buku', pageTitle: 'Data Buku'),
+      (label: 'Anggota', pageTitle: 'Data Anggota'),
+      (label: 'Transaksi', pageTitle: 'Pinjam Buku'),
+      (label: 'Laporan', pageTitle: 'Ringkasan Harian'),
+      (label: 'Profil', pageTitle: 'Informasi Akun'),
+    ];
+
+    for (final destination in destinations) {
+      final item = find.byKey(Key('bottom_navigation_${destination.label}'));
+      expect(tester.getSize(item).width, 60);
+
+      await tester.tap(item);
+      await tester.pumpAndSettle();
+
+      expect(find.text(destination.pageTitle), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets('dashboard shows at most three active loan cards', (
     WidgetTester tester,
   ) async {

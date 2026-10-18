@@ -697,7 +697,7 @@ class _DashboardPageState extends State<DashboardPage> {
         );
       case 3:
         return LoansPage(loans: _loans, onAdd: _addLoan, onReturn: _returnLoan);
-      case 4:
+      case 5:
         return ProfilePage(
           userProfile: _userProfile,
           onProfileUpdated: _saveProfile,
@@ -708,7 +708,7 @@ class _DashboardPageState extends State<DashboardPage> {
             );
           },
         );
-      case 5:
+      case 4:
         return LoanReportsPage(loans: _loans);
       default:
         return DashboardContent(
@@ -813,43 +813,121 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    const destinations = [
+      (icon: Icons.home_outlined, selectedIcon: Icons.home, label: 'Beranda'),
+      (
+        icon: Icons.menu_book_outlined,
+        selectedIcon: Icons.menu_book,
+        label: 'Buku',
+      ),
+      (
+        icon: Icons.people_outline,
+        selectedIcon: Icons.people,
+        label: 'Anggota',
+      ),
+      (
+        icon: Icons.swap_horiz,
+        selectedIcon: Icons.swap_horiz,
+        label: 'Transaksi',
+      ),
+      (
+        icon: Icons.assessment_outlined,
+        selectedIcon: Icons.assessment,
+        label: 'Laporan',
+      ),
+      (icon: Icons.person_outline, selectedIcon: Icons.person, label: 'Profil'),
+    ];
+
     return Scaffold(
       body: _buildCurrentPage(),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _selectTab,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Beranda',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            key: const Key('main_bottom_navigation'),
+            height: 72,
+            child: Row(
+              children: [
+                for (var index = 0; index < destinations.length; index++)
+                  Expanded(
+                    child: _buildNavigationItem(
+                      icon: destinations[index].icon,
+                      selectedIcon: destinations[index].selectedIcon,
+                      label: destinations[index].label,
+                      selected: _selectedIndex == index,
+                      onTap: () => _selectTab(index),
+                      colorScheme: colorScheme,
+                    ),
+                  ),
+              ],
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book),
-            label: 'Buku',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavigationItem({
+    required IconData icon,
+    required IconData selectedIcon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    required ColorScheme colorScheme,
+  }) {
+    final itemColor = selected
+        ? colorScheme.primary
+        : colorScheme.onSurfaceVariant;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: InkWell(
+        key: ValueKey('bottom_navigation_$label'),
+        onTap: onTap,
+        child: SizedBox.expand(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? colorScheme.primary.withValues(alpha: 0.12)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  selected ? selectedIcon : icon,
+                  size: 22,
+                  color: itemColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: itemColor,
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.w500 : FontWeight.normal,
+                  height: 1.1,
+                ),
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'Anggota',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.swap_horiz),
-            selectedIcon: Icon(Icons.swap_horiz),
-            label: 'Transaksi',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profil',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.assessment_outlined),
-            selectedIcon: Icon(Icons.assessment),
-            label: 'Laporan',
-          ),
-        ],
+        ),
       ),
     );
   }
