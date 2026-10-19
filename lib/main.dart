@@ -14,11 +14,11 @@ import 'package:flutter_application_1/services/user_profile_local_store.dart';
 export 'models/library_models.dart';
 
 void main() {
-  runApp(SipMobileApp(provisionDemoAccounts: true));
+  runApp(const SipMobileApp(provisionDemoAccounts: true));
 }
 
 class SipMobileApp extends StatelessWidget {
-  SipMobileApp({
+  const SipMobileApp({
     super.key,
     this.accountStore = const UserAccountStore(),
     this.provisionDemoAccounts = false,
@@ -123,7 +123,7 @@ class _SplashScreenState extends State<SplashScreen> {
 }
 
 class LoginPage extends StatefulWidget {
-  LoginPage({
+  const LoginPage({
     super.key,
     this.accountStore = const UserAccountStore(),
     this.provisionDemoAccounts = false,
@@ -621,7 +621,7 @@ class _InitialAdminDialogState extends State<_InitialAdminDialog> {
 }
 
 class DashboardPage extends StatefulWidget {
-  DashboardPage({
+  const DashboardPage({
     super.key,
     required this.session,
     required this.userProfile,
@@ -1339,32 +1339,40 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ];
 
-    return Scaffold(
-      body: _buildCurrentPage(),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            key: const Key('main_bottom_navigation'),
-            height: 72,
-            child: Row(
-              children: [
-                for (var index = 0; index < destinations.length; index++)
-                  Expanded(
-                    child: _buildNavigationItem(
-                      icon: destinations[index].icon,
-                      selectedIcon: destinations[index].selectedIcon,
-                      label: destinations[index].label,
-                      selected: _selectedIndex == index,
-                      onTap: () => _selectTab(index),
-                      colorScheme: colorScheme,
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _selectedIndex != 0) {
+          setState(() => _selectedIndex = 0);
+        }
+      },
+      child: Scaffold(
+        body: _buildCurrentPage(),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              key: const Key('main_bottom_navigation'),
+              height: 72,
+              child: Row(
+                children: [
+                  for (var index = 0; index < destinations.length; index++)
+                    Expanded(
+                      child: _buildNavigationItem(
+                        icon: destinations[index].icon,
+                        selectedIcon: destinations[index].selectedIcon,
+                        label: destinations[index].label,
+                        selected: _selectedIndex == index,
+                        onTap: () => _selectTab(index),
+                        colorScheme: colorScheme,
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -19,8 +19,7 @@ class LibrarySnapshot {
 }
 
 class LibraryLocalStore {
-  LibraryLocalStore({this.databasePath, DatabaseFactory? factory})
-    : _factory = factory;
+  LibraryLocalStore({this.databasePath, this.factory});
 
   static const databaseName = 'sip_mobile_library.db';
   static const _databaseVersion = 1;
@@ -28,10 +27,10 @@ class LibraryLocalStore {
   static const _seedVersion = '1';
 
   final String? databasePath;
-  final DatabaseFactory? _factory;
+  final DatabaseFactory? factory;
   Future<Database>? _databaseFuture;
 
-  DatabaseFactory get _databaseFactory => _factory ?? databaseFactory;
+  DatabaseFactory get _databaseFactory => factory ?? databaseFactory;
 
   Future<Database> get _database => _databaseFuture ??= _openDatabase();
 

@@ -68,7 +68,9 @@ class LoanReportSnapshot {
   int get overdueCount => _loans
       .where(
         (loan) =>
-            _isInPeriod(loan) && statusOf(loan) == LoanReportStatus.overdue,
+            (_isWithin(loan.borrowedAt) ||
+                (loan.returnedAt != null && _isWithin(loan.returnedAt!))) &&
+            statusOf(loan) == LoanReportStatus.overdue,
       )
       .length;
 

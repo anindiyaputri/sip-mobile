@@ -15,19 +15,55 @@ import 'package:flutter_application_1/main.dart';
 import 'package:flutter_application_1/models/user_profile.dart';
 import 'package:flutter_application_1/pages/loan_reports_page.dart';
 import 'package:flutter_application_1/pages/user_accounts_page.dart';
+import 'package:flutter_application_1/services/library_local_store.dart';
 import 'package:flutter_application_1/services/user_account_store.dart';
 import 'package:flutter_application_1/services/user_profile_photo_store.dart';
 import 'package:flutter_application_1/services/user_profile_local_store.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   late UserAccountStore accountStore;
+  late Directory libraryDirectory;
+  late LibraryLocalStore libraryStore;
   AuthenticatedSession? adminSession;
 
-  setUp(() {
+  setUpAll(() {
+    sqfliteFfiInit();
+  });
+
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
     accountStore = const UserAccountStore(useIsolates: false);
     adminSession = null;
+    libraryDirectory = await Directory.systemTemp.createTemp(
+      'sip-library-widget-test-',
+    );
+    libraryStore = LibraryLocalStore(
+      databasePath:
+          '${libraryDirectory.path}${Platform.pathSeparator}library.db',
+      factory: databaseFactoryFfi,
+    );
   });
+
+  tearDown(() async {
+    await libraryStore.close();
+    await libraryDirectory.delete(recursive: true);
+  });
+
+  Future<void> pumpApp(
+    WidgetTester tester, {
+    bool provisionDemoAccounts = false,
+  }) async {
+    await tester.pumpWidget(
+      SipMobileApp(
+        accountStore: accountStore,
+        provisionDemoAccounts: provisionDemoAccounts,
+        libraryStore: libraryStore,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpAndSettle();
+  }
 
   Future<AuthenticatedSession> ensureTestAdmin() async {
     if (adminSession != null) return adminSession!;
@@ -181,7 +217,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await createTestAccount('admin@gmail.com', UserRole.admin, name: 'Admin');
-    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+    await pumpApp(tester);
     await tester.enterText(
       find.byType(TextFormField).at(0),
       '  ADMIN@gmail.com ',
@@ -251,7 +287,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await ensureTestAdmin();
-    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+    await pumpApp(tester);
 
     expect(find.text('Selamat Datang Kembali'), findsOneWidget);
     expect(find.text('SIP Mobile'), findsOneWidget);
@@ -285,10 +321,7 @@ void main() {
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(
-      SipMobileApp(accountStore: accountStore, provisionDemoAccounts: true),
-    );
-    await tester.pumpAndSettle();
+    await pumpApp(tester, provisionDemoAccounts: true);
 
     const demoAccounts = [
       (login: 'admin@email.com', password: 'admin123', role: UserRole.admin),
@@ -344,10 +377,7 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
-      await tester.pumpWidget(
-        SipMobileApp(accountStore: accountStore, provisionDemoAccounts: true),
-      );
-      await tester.pumpAndSettle();
+      await pumpApp(tester, provisionDemoAccounts: true);
     }
   });
 
@@ -355,7 +385,7 @@ void main() {
     'first use provisions an Admin and login rejects invalid credentials',
     (WidgetTester tester) async {
       SharedPreferences.setMockInitialValues({});
-      await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+      await pumpApp(tester);
       await tester.pumpAndSettle();
 
       expect(find.text('Buat akun Admin pertama'), findsOneWidget);
@@ -411,7 +441,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+    await pumpApp(tester);
     expect(tester.takeException(), isNull, reason: 'Login screen');
     await tester.enterText(find.byType(TextFormField).at(0), 'admin@email.com');
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
@@ -465,13 +495,48 @@ void main() {
       UserRole.siswa,
       memberId: 2,
     );
+    final catalog = await libraryStore.initialize(
+      initialBooks: const [
+        Book(
+          id: 1,
+          title: 'Buku Riwayat Uji',
+          author: 'Pengarang Uji',
+          category: 'Uji',
+          copies: 2,
+        ),
+      ],
+      initialMembers: const [
+        Member(
+          id: 1,
+          name: 'Andi Saputra',
+          phone: '081234567890',
+          email: 'andi@email.com',
+        ),
+        Member(
+          id: 2,
+          name: 'Siti Rahma',
+          phone: '081298765432',
+          email: 'siti@email.com',
+        ),
+      ],
+    );
+    for (final account in [guru, siswa]) {
+      await libraryStore.createLoan(
+        memberId: account.memberId!,
+        bookId: catalog.books.single.id,
+        borrowedAt: DateTime(2026, 1, 1),
+        dueAt: DateTime(2026, 1, 8),
+        quantity: 1,
+        ownerUserId: account.id,
+      );
+    }
 
     for (final account in [guru, siswa]) {
       final session = await accountStore.authenticate(
         account.login,
         'password123',
       );
-      await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+      await pumpApp(tester);
       await tester.enterText(find.byType(TextFormField).at(0), account.login);
       await tester.enterText(find.byType(TextFormField).at(1), 'password123');
       await tester.tap(find.text('Masuk'));
@@ -501,8 +566,8 @@ void main() {
 
       final ownLoan = Loan(
         id: 11,
-        bookId: 11,
-        memberId: 1,
+        bookId: 1,
+        memberId: account.memberId!,
         bookTitle: 'Transaksi milik sendiri',
         memberName: account.login,
         borrowedAt: DateTime(2026, 1, 1),
@@ -671,7 +736,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await ensureTestAdmin();
-    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+    await pumpApp(tester);
     await tester.enterText(find.byType(TextFormField).at(0), 'admin@email.com');
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
     await tester.tap(find.text('Masuk'));
@@ -717,7 +782,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await ensureTestAdmin();
-    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+    await pumpApp(tester);
     await tester.enterText(find.byType(TextFormField).at(0), 'admin@email.com');
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
     await tester.tap(find.text('Masuk'));
@@ -740,11 +805,22 @@ void main() {
 
     await tester.tap(find.text('Transaksi').last);
     await tester.pumpAndSettle();
-    expect(find.text('Sedang Dipinjam (2)'), findsOneWidget);
+    expect(find.text('Sedang Dipinjam (0)'), findsOneWidget);
+    await tester.tap(find.text('Pinjam Buku'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Simpan'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sedang Dipinjam (1)'), findsOneWidget);
+    expect((await libraryStore.load()).loans, hasLength(1));
+
     await tester.tap(find.byTooltip('Proses pengembalian').first);
     await tester.pumpAndSettle();
+    expect(find.text('Konfirmasi pengembalian'), findsOneWidget);
+    await tester.tap(find.text('Konfirmasi'));
+    await tester.pumpAndSettle();
     expect(find.text('Riwayat Pengembalian (1)'), findsOneWidget);
-    expect(find.text('Sedang Dipinjam (1)'), findsOneWidget);
+    expect(find.text('Sedang Dipinjam (0)'), findsOneWidget);
+    expect((await libraryStore.load()).loans.single.status, 'Dikembalikan');
 
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
@@ -752,14 +828,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Simpan'));
     await tester.pumpAndSettle();
-    expect(find.text('Sedang Dipinjam (2)'), findsOneWidget);
+    expect(find.text('Sedang Dipinjam (1)'), findsOneWidget);
+    expect((await libraryStore.load()).loans, hasLength(2));
   });
 
   testWidgets('profile shows entered email and confirms logout', (
     WidgetTester tester,
   ) async {
     await createTestAccount('petugas@sip.id', UserRole.guru);
-    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+    await pumpApp(tester);
     await tester.enterText(find.byType(TextFormField).at(0), 'petugas@sip.id');
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
     await tester.tap(find.text('Masuk'));
@@ -814,7 +891,7 @@ void main() {
   ) async {
     await createTestAccount('pertama@sip.id', UserRole.guru, memberId: 1);
     await createTestAccount('kedua@sip.id', UserRole.siswa, memberId: 2);
-    await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+    await pumpApp(tester);
 
     Future<void> loginWith(String login) async {
       await tester.enterText(find.byType(TextFormField).at(0), login);
@@ -872,7 +949,7 @@ void main() {
     'account settings updates profile details and returns to profile page',
     (WidgetTester tester) async {
       await createTestAccount('akun@sip.id', UserRole.siswa);
-      await tester.pumpWidget(SipMobileApp(accountStore: accountStore));
+      await pumpApp(tester);
       await tester.enterText(find.byType(TextFormField).at(0), 'akun@sip.id');
       await tester.enterText(find.byType(TextFormField).at(1), 'password123');
       await tester.tap(find.text('Masuk'));

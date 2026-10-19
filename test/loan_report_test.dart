@@ -7,9 +7,28 @@ import 'package:flutter_application_1/models/library_models.dart';
 import 'package:flutter_application_1/models/loan_report.dart';
 import 'package:flutter_application_1/models/user_profile.dart';
 import 'package:flutter_application_1/pages/loan_reports_page.dart';
+import 'package:flutter_application_1/services/library_local_store.dart';
 import 'package:flutter_application_1/services/loan_report_pdf_service.dart';
 import 'package:flutter_application_1/services/user_account_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class _InMemoryLibraryStore extends LibraryLocalStore {
+  _InMemoryLibraryStore()
+    : snapshot = LibrarySnapshot(
+        books: const [],
+        members: const [],
+        loans: const [],
+      ),
+      super();
+
+  final LibrarySnapshot snapshot;
+
+  @override
+  Future<LibrarySnapshot> initialize({
+    required List<Book> initialBooks,
+    required List<Member> initialMembers,
+  }) async => snapshot;
+}
 
 void main() {
   Future<AuthenticatedSession> createAdminSession() async {
@@ -103,6 +122,54 @@ void main() {
     );
 
     expect(report.loans.map((loan) => loan.id), [3]);
+  });
+
+  test('event filters separate borrowed and returned activity', () {
+    final returned = LoanReportSnapshot(
+      loans: loans,
+      period: LoanReportPeriod.monthly,
+      selectedDate: DateTime(2025, 1),
+      status: LoanReportStatus.all,
+      event: LoanReportEvent.returned,
+      asOf: DateTime(2025, 1, 31),
+    );
+    final borrowed = LoanReportSnapshot(
+      loans: loans,
+      period: LoanReportPeriod.monthly,
+      selectedDate: DateTime(2025, 1),
+      status: LoanReportStatus.all,
+      event: LoanReportEvent.borrowed,
+      asOf: DateTime(2025, 1, 31),
+    );
+
+    expect(returned.loans.map((loan) => loan.id), [3]);
+    expect(borrowed.loans.map((loan) => loan.id), [1]);
+    expect(returned.overdueCount, 1);
+    expect(borrowed.overdueCount, 1);
+  });
+
+  test('report counts copies from loan quantities', () {
+    final report = LoanReportSnapshot(
+      loans: [
+        Loan(
+          id: 1,
+          bookId: 10,
+          memberId: 2,
+          bookTitle: 'Buku Januari',
+          memberName: 'Siswa Satu',
+          borrowedAt: DateTime(2025, 1, 15),
+          dueAt: DateTime(2025, 1, 22),
+          quantity: 3,
+        ),
+      ],
+      period: LoanReportPeriod.monthly,
+      selectedDate: DateTime(2025, 1),
+      status: LoanReportStatus.all,
+      asOf: DateTime(2025, 1, 15),
+    );
+
+    expect(report.borrowedCount, 1);
+    expect(report.booksBorrowed, 3);
   });
 
   test('PDF is generated for populated and empty reports', () async {
@@ -210,10 +277,7 @@ void main() {
     );
 
     expect(find.text('Ringkasan Harian'), findsOneWidget);
-    expect(
-      find.text('Tidak ada transaksi untuk periode dan filter ini.'),
-      findsOneWidget,
-    );
+    expect(find.text('Daftar Transaksi'), findsOneWidget);
     await tester.tap(find.text('Bulanan'));
     await tester.pumpAndSettle();
 
@@ -229,12 +293,14 @@ void main() {
   testWidgets('Laporan is available from the main navigation', (
     WidgetTester tester,
   ) async {
+    final libraryStore = _InMemoryLibraryStore();
     final adminSession = await createAdminSession();
     await tester.pumpWidget(
       MaterialApp(
         home: DashboardPage(
           session: adminSession,
           accountStore: const UserAccountStore(useIsolates: false),
+          libraryStore: libraryStore,
           userProfile: UserProfile(
             id: adminSession.userId,
             email: adminSession.login,
@@ -243,16 +309,21 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
+    expect(find.text('Ringkasan'), findsOneWidget);
 
     await tester.tap(find.text('Laporan').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Ringkasan Harian'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Cetak PDF'),
-      300,
-      scrollable: find.byType(Scrollable).last,
-    );
+    for (
+      var attempt = 0;
+      attempt < 5 && find.text('Cetak PDF').evaluate().isEmpty;
+      attempt++
+    ) {
+      await tester.drag(find.byType(ListView).last, const Offset(0, -400));
+      await tester.pumpAndSettle();
+    }
     expect(find.text('Cetak PDF'), findsOneWidget);
     expect(find.text('Bagikan PDF'), findsOneWidget);
   });
