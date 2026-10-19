@@ -11,16 +11,18 @@ import 'package:flutter_application_1/services/user_profile_local_store.dart';
 export 'models/library_models.dart';
 
 void main() {
-  runApp(const SipMobileApp());
+  runApp(const SipMobileApp(provisionDemoAccounts: true));
 }
 
 class SipMobileApp extends StatelessWidget {
   const SipMobileApp({
     super.key,
     this.accountStore = const UserAccountStore(),
+    this.provisionDemoAccounts = false,
   });
 
   final UserAccountStore accountStore;
+  final bool provisionDemoAccounts;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +35,10 @@ class SipMobileApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF7F8FC),
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3157D5)),
       ),
-      home: LoginPage(accountStore: accountStore),
+      home: LoginPage(
+        accountStore: accountStore,
+        provisionDemoAccounts: provisionDemoAccounts,
+      ),
     );
   }
 }
@@ -42,9 +47,11 @@ class LoginPage extends StatefulWidget {
   const LoginPage({
     super.key,
     this.accountStore = const UserAccountStore(),
+    this.provisionDemoAccounts = false,
   });
 
   final UserAccountStore accountStore;
+  final bool provisionDemoAccounts;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -68,6 +75,9 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _refreshAccountStatus() async {
     try {
+      if (widget.provisionDemoAccounts) {
+        await _accountStore.ensureDemoAccounts();
+      }
       final hasAccounts = await _accountStore.hasAccounts();
       if (mounted) setState(() => _hasAccounts = hasAccounts);
     } on Exception catch (error) {

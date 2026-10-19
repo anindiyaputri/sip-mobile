@@ -52,6 +52,82 @@ class UserAccountStore {
 
   Future<bool> hasAccounts() async => (await _readAccounts()).isNotEmpty;
 
+  Future<void> ensureDemoAccounts() async {
+    final accounts = await _readAccounts();
+    const demoAccounts = [
+      (
+        login: 'admin@email.com',
+        password: 'admin123',
+        role: UserRole.admin,
+        memberId: null,
+      ),
+      (
+        login: 'guru@email.com',
+        password: 'guru123',
+        role: UserRole.guru,
+        memberId: 1,
+      ),
+      (
+        login: 'siswa@email.com',
+        password: 'siswa123',
+        role: UserRole.siswa,
+        memberId: 2,
+      ),
+    ];
+    var changed = false;
+
+    for (final demo in demoAccounts) {
+      final normalizedLogin = _normalizeLogin(demo.login);
+      final index = accounts.indexWhere(
+        (account) => _normalizeLogin(account.login) == normalizedLogin,
+      );
+      final existing = index < 0 ? null : accounts[index];
+      final memberIdIsAvailable =
+          demo.memberId == null ||
+          !accounts.any(
+            (account) =>
+                account.memberId == demo.memberId && account.id != existing?.id,
+          );
+      final memberId = memberIdIsAvailable ? demo.memberId : existing?.memberId;
+
+      if (existing == null) {
+        accounts.add(
+          await _newAccount(
+            login: demo.login,
+            password: demo.password,
+            role: demo.role,
+            memberId: memberId,
+            useIsolate: useIsolates,
+          ),
+        );
+        changed = true;
+        continue;
+      }
+
+      final passwordHash = await _deriveAccountPassword(
+        demo.password,
+        existing.salt,
+        useIsolate: useIsolates,
+      );
+      final passwordMatches = _matchesPassword(existing, passwordHash);
+      if (existing.role != demo.role ||
+          existing.memberId != memberId ||
+          !passwordMatches) {
+        var updated = existing.withRoleAndMember(demo.role, memberId);
+        if (!passwordMatches) {
+          updated = await updated.withPassword(
+            demo.password,
+            useIsolate: useIsolates,
+          );
+        }
+        accounts[index] = updated;
+        changed = true;
+      }
+    }
+
+    if (changed) await _writeAccounts(accounts);
+  }
+
   Future<AuthenticatedSession> authenticate(
     String login,
     String password,

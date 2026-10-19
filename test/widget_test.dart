@@ -281,6 +281,76 @@ void main() {
     expect(find.text('Transaksi'), findsOneWidget);
   });
 
+  testWidgets('demo accounts open dashboards with role-specific menus', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      SipMobileApp(accountStore: accountStore, provisionDemoAccounts: true),
+    );
+    await tester.pumpAndSettle();
+
+    const demoAccounts = [
+      (login: 'admin@email.com', password: 'admin123', role: UserRole.admin),
+      (login: 'guru@email.com', password: 'guru123', role: UserRole.guru),
+      (login: 'siswa@email.com', password: 'siswa123', role: UserRole.siswa),
+    ];
+    for (final demo in demoAccounts) {
+      await tester.enterText(find.byType(TextFormField).at(0), demo.login);
+      await tester.enterText(find.byType(TextFormField).at(1), demo.password);
+      await tester.tap(find.text('Masuk'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('bottom_navigation_Beranda')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('bottom_navigation_Buku')), findsOneWidget);
+      if (demo.role == UserRole.admin) {
+        expect(
+          find.byKey(const Key('bottom_navigation_Anggota')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('bottom_navigation_Transaksi')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('bottom_navigation_Laporan')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('bottom_navigation_Riwayat')),
+          findsNothing,
+        );
+      } else {
+        expect(
+          find.byKey(const Key('bottom_navigation_Riwayat')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('bottom_navigation_Anggota')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('bottom_navigation_Transaksi')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('bottom_navigation_Laporan')),
+          findsNothing,
+        );
+      }
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        SipMobileApp(accountStore: accountStore, provisionDemoAccounts: true),
+      );
+      await tester.pumpAndSettle();
+    }
+  });
+
   testWidgets(
     'first use provisions an Admin and login rejects invalid credentials',
     (WidgetTester tester) async {

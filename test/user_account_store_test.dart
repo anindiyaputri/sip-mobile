@@ -55,6 +55,54 @@ void main() {
   });
 
   test(
+    'demo accounts authenticate with the configured roles and credentials',
+    () async {
+      await store.ensureDemoAccounts();
+
+      const demoAccounts = [
+        (login: 'admin@email.com', password: 'admin123', role: UserRole.admin),
+        (login: 'guru@email.com', password: 'guru123', role: UserRole.guru),
+        (login: 'siswa@email.com', password: 'siswa123', role: UserRole.siswa),
+      ];
+      for (final demo in demoAccounts) {
+        final session = await store.authenticate(demo.login, demo.password);
+        expect(session.role, demo.role);
+        await expectLater(
+          store.authenticate(demo.login, 'wrong-password'),
+          throwsFormatException,
+        );
+      }
+      await expectLater(
+        store.authenticate('not-registered@email.com', 'admin123'),
+        throwsFormatException,
+      );
+    },
+  );
+
+  test(
+    'demo provisioning is repeatable and preserves unrelated accounts',
+    () async {
+      final unrelated = await store.createAccount(
+        session: admin,
+        login: 'existing.admin',
+        password: 'existing-pass-123',
+        role: UserRole.admin,
+      );
+
+      await store.ensureDemoAccounts();
+      await store.ensureDemoAccounts();
+
+      final authenticatedExisting = await store.authenticate(
+        unrelated.login,
+        'existing-pass-123',
+      );
+      expect(authenticatedExisting.userId, unrelated.id);
+      expect(authenticatedExisting.role, UserRole.admin);
+      expect((await store.listAccounts(admin)).length, 5);
+    },
+  );
+
+  test(
     'invalid credentials fail and first Admin cannot be provisioned twice',
     () async {
       await expectLater(
