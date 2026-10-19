@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/models/library_models.dart';
 import 'package:flutter_application_1/pages/access_denied_page.dart';
@@ -5,24 +7,27 @@ import 'package:flutter_application_1/pages/loan_reports_page.dart';
 import 'package:flutter_application_1/models/user_profile.dart';
 import 'package:flutter_application_1/pages/user_accounts_page.dart';
 import 'package:flutter_application_1/pages/profile_page.dart';
+import 'package:flutter_application_1/services/library_local_store.dart';
 import 'package:flutter_application_1/services/user_account_store.dart';
 import 'package:flutter_application_1/services/user_profile_local_store.dart';
 
 export 'models/library_models.dart';
 
 void main() {
-  runApp(const SipMobileApp(provisionDemoAccounts: true));
+  runApp(SipMobileApp(provisionDemoAccounts: true));
 }
 
 class SipMobileApp extends StatelessWidget {
-  const SipMobileApp({
+  SipMobileApp({
     super.key,
     this.accountStore = const UserAccountStore(),
     this.provisionDemoAccounts = false,
+    this.libraryStore,
   });
 
   final UserAccountStore accountStore;
   final bool provisionDemoAccounts;
+  final LibraryLocalStore? libraryStore;
 
   @override
   Widget build(BuildContext context) {
@@ -35,23 +40,99 @@ class SipMobileApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF7F8FC),
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3157D5)),
       ),
-      home: LoginPage(
+      home: SplashScreen(
         accountStore: accountStore,
         provisionDemoAccounts: provisionDemoAccounts,
+        libraryStore: libraryStore,
+      ),
+    );
+  }
+}
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({
+    super.key,
+    required this.accountStore,
+    required this.provisionDemoAccounts,
+    this.libraryStore,
+  });
+
+  final UserAccountStore accountStore;
+  final bool provisionDemoAccounts;
+  final LibraryLocalStore? libraryStore;
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => LoginPage(
+            accountStore: widget.accountStore,
+            provisionDemoAccounts: widget.provisionDemoAccounts,
+            libraryStore: widget.libraryStore,
+          ),
+        ),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.menu_book_rounded, size: 64, color: Color(0xFF3157D5)),
+              SizedBox(height: 16),
+              Text(
+                'SIP Mobile',
+                style: TextStyle(
+                  color: Color(0xFF17233D),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Sistem Informasi Perpustakaan',
+                style: TextStyle(color: Color(0xFF77839A), fontSize: 13),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({
+  LoginPage({
     super.key,
     this.accountStore = const UserAccountStore(),
     this.provisionDemoAccounts = false,
+    this.libraryStore,
   });
 
   final UserAccountStore accountStore;
   final bool provisionDemoAccounts;
+  final LibraryLocalStore? libraryStore;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -122,6 +203,7 @@ class _LoginPageState extends State<LoginPage> {
             session: session,
             userProfile: userProfile,
             accountStore: _accountStore,
+            libraryStore: widget.libraryStore,
           ),
         ),
       );
@@ -539,16 +621,18 @@ class _InitialAdminDialogState extends State<_InitialAdminDialog> {
 }
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({
+  DashboardPage({
     super.key,
     required this.session,
     required this.userProfile,
     required this.accountStore,
+    this.libraryStore,
   });
 
   final AuthenticatedSession session;
   final UserProfile userProfile;
   final UserAccountStore accountStore;
+  final LibraryLocalStore? libraryStore;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -560,12 +644,15 @@ class _DashboardPageState extends State<DashboardPage> {
   late UserProfile _userProfile;
   late AuthenticatedSession _session;
   late final UserAccountStore _accountStore;
+  late final LibraryLocalStore _libraryStore;
   final _profileStore = UserProfileLocalStore();
-  int _nextBookId = 32;
-  int _nextMemberId = 3;
-  int _nextLoanId = 3;
+  bool _isLoadingLibrary = true;
+  bool _isSavingTransaction = false;
+  List<Book> _books = [];
+  List<Member> _members = [];
+  List<Loan> _loans = [];
 
-  late final List<Book> _books = [
+  late final List<Book> _initialBooks = [
     const Book(
       id: 1,
       title: 'Dasar-Dasar Teknik Jaringan Komputer dan Telekomunikasi untuk SMK/MAK Kelas X',
@@ -785,7 +872,7 @@ class _DashboardPageState extends State<DashboardPage> {
     ),
   ];
 
-  late final List<Member> _members = [
+  late final List<Member> _initialMembers = [
     const Member(
       id: 1,
       name: 'Andi Saputra',
@@ -800,36 +887,47 @@ class _DashboardPageState extends State<DashboardPage> {
     ),
   ];
 
-  late final List<Loan> _loans = [
-    Loan(
-      id: 1,
-      bookId: 1,
-      memberId: 1,
-      bookTitle: 'Dasar-Dasar Teknik Jaringan Komputer dan Telekomunikasi untuk SMK/MAK Kelas X',
-      memberName: 'Andi Saputra',
-      borrowedAt: DateTime.now().subtract(const Duration(days: 2)),
-      dueAt: DateTime.now().add(const Duration(days: 5)),
-    ),
-    Loan(
-      id: 2,
-      bookId: 2,
-      memberId: 2,
-      bookTitle: 'Buku Panduan Guru Dasar-Dasar Teknik Jaringan Komputer dan Telekomunikasi untuk SMK/MAK Kelas X',
-      memberName: 'Siti Rahma',
-      borrowedAt: DateTime.now().subtract(const Duration(days: 1)),
-      dueAt: DateTime.now().add(const Duration(days: 6)),
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
     _userProfile = widget.userProfile;
     _session = widget.session;
     _accountStore = widget.accountStore;
+    _libraryStore = widget.libraryStore ?? LibraryLocalStore();
+    _loadLibrary();
   }
 
   bool get _isAdmin => _session.role == UserRole.admin;
+
+  Future<void> _loadLibrary() async {
+    try {
+      final snapshot = await _libraryStore.initialize(
+        initialBooks: _initialBooks,
+        initialMembers: _initialMembers,
+      );
+      if (!mounted) return;
+      setState(() {
+        _books = snapshot.books;
+        _members = snapshot.members;
+        _loans = snapshot.loans;
+        _isLoadingLibrary = false;
+      });
+    } on Exception catch (error) {
+      if (!mounted) return;
+      setState(() => _isLoadingLibrary = false);
+      _showMessage('Data perpustakaan gagal dimuat: $error');
+    }
+  }
+
+  Future<void> _reloadLibrary() async {
+    final snapshot = await _libraryStore.load();
+    if (!mounted) return;
+    setState(() {
+      _books = snapshot.books;
+      _members = snapshot.members;
+      _loans = snapshot.loans;
+    });
+  }
 
   Future<bool> _saveProfile(UserProfile profile) async {
     if (profile.id != _session.userId) {
@@ -872,7 +970,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   int _activeLoansForBook(int bookId) => _loans
       .where((loan) => loan.bookId == bookId && loan.returnedAt == null)
-      .length;
+      .fold(0, (total, loan) => total + loan.quantity);
 
   int _availableCopies(Book book) => book.copies - _activeLoansForBook(book.id);
 
@@ -883,68 +981,94 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _addLoan() async {
-    if (!_isAdmin) {
-      _showMessage('Hanya Admin yang dapat mencatat peminjaman.');
+    if (!_isAdmin || _isSavingTransaction) {
+      if (!_isAdmin) {
+        _showMessage('Hanya Admin yang dapat mencatat peminjaman.');
+      }
       return;
     }
-    final availableBooks = _books
-        .where((book) => _availableCopies(book) > 0)
-        .toList();
-    if (_members.isEmpty || availableBooks.isEmpty) {
+    if (_members.isEmpty || _books.isEmpty) {
       _showMessage(
         _members.isEmpty
             ? 'Tambahkan anggota sebelum mencatat peminjaman.'
-            : 'Tidak ada buku yang tersedia untuk dipinjam.',
+            : 'Tambahkan buku sebelum mencatat peminjaman.',
       );
       return;
     }
 
-    final loan = await _showLoanForm(context, availableBooks, _members);
-    if (!mounted || loan == null) return;
-    final ownerUserId = await _accountStore.userIdForMember(loan.memberId);
-    if (!mounted) return;
-    setState(() {
-      _loans.add(
-        Loan(
-          id: _nextLoanId++,
-          bookId: loan.bookId,
-          memberId: loan.memberId,
-          bookTitle: loan.bookTitle,
-          memberName: loan.memberName,
-          borrowedAt: loan.borrowedAt,
-          dueAt: loan.dueAt,
-          ownerUserId: ownerUserId,
-        ),
+    setState(() => _isSavingTransaction = true);
+    try {
+      final loan = await _showLoanForm(
+        context,
+        _books,
+        _members,
+        _availableCopies,
       );
-    });
+      if (!mounted || loan == null) return;
+      final ownerUserId = await _accountStore.userIdForMember(loan.memberId);
+      await _libraryStore.createLoan(
+        memberId: loan.memberId,
+        bookId: loan.bookId,
+        borrowedAt: loan.borrowedAt,
+        dueAt: loan.dueAt,
+        quantity: loan.quantity,
+        ownerUserId: ownerUserId,
+      );
+      await _reloadLibrary();
+      if (mounted) _showMessage('Peminjaman berhasil disimpan.');
+    } on Exception catch (error) {
+      if (mounted) _showMessage('Peminjaman gagal disimpan: $error');
+    } finally {
+      if (mounted) setState(() => _isSavingTransaction = false);
+    }
   }
 
-  void _returnLoan(Loan loan) {
+  Future<void> _returnLoan(Loan loan) async {
     if (!_isAdmin) {
       _showMessage('Hanya Admin yang dapat memproses pengembalian.');
       return;
     }
-    setState(() {
-      final index = _loans.indexWhere((item) => item.id == loan.id);
-      if (index != -1) {
-        final current = _loans[index];
-        _loans[index] = Loan(
-          id: current.id,
-          bookId: current.bookId,
-          memberId: current.memberId,
-          bookTitle: current.bookTitle,
-          memberName: current.memberName,
-          borrowedAt: current.borrowedAt,
-          dueAt: current.dueAt,
-          returnedAt: DateTime.now(),
-          ownerUserId: current.ownerUserId,
-        );
-      }
-    });
-    _showMessage('${loan.bookTitle} berhasil dikembalikan.');
+    if (_isSavingTransaction) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Konfirmasi pengembalian'),
+        content: Text(
+          '${loan.bookTitle}\n'
+          'Anggota: ${loan.memberName}\n'
+          'Jumlah: ${loan.quantity}\n'
+          'Tanggal pinjam: ${_formatDate(loan.borrowedAt)}\n'
+          'Batas pengembalian: ${_formatDate(loan.dueAt)}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Konfirmasi'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    setState(() => _isSavingTransaction = true);
+    try {
+      await _libraryStore.returnLoan(loan.id, DateTime.now());
+      await _reloadLibrary();
+      if (mounted) _showMessage('${loan.bookTitle} berhasil dikembalikan.');
+    } on Exception catch (error) {
+      if (mounted) _showMessage('Pengembalian gagal disimpan: $error');
+    } finally {
+      if (mounted) setState(() => _isSavingTransaction = false);
+    }
   }
 
   Widget _buildCurrentPage() {
+    if (_isLoadingLibrary) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     if (_isAdmin) {
       switch (_selectedIndex) {
         case 1:
@@ -973,7 +1097,12 @@ class _DashboardPageState extends State<DashboardPage> {
             onReturn: _returnLoan,
           );
         case 4:
-          return LoanReportsPage(session: _session, loans: _loans);
+          return LoanReportsPage(
+            session: _session,
+            loans: _loans,
+            books: _books,
+            members: _members,
+          );
         case 5:
           return _buildProfilePage();
         case 6:
@@ -1024,7 +1153,10 @@ class _DashboardPageState extends State<DashboardPage> {
       onLogout: () {
         Navigator.of(context).pushAndRemoveUntil<void>(
           MaterialPageRoute<void>(
-            builder: (_) => LoginPage(accountStore: _accountStore),
+            builder: (_) => LoginPage(
+              accountStore: _accountStore,
+              libraryStore: _libraryStore,
+            ),
           ),
           (route) => false,
         );
@@ -1045,17 +1177,12 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     final book = await _showBookForm(context);
     if (!mounted || book == null) return;
-    setState(() {
-      _books.add(
-        Book(
-          id: _nextBookId++,
-          title: book.title,
-          author: book.author,
-          category: book.category,
-          copies: book.copies,
-        ),
-      );
-    });
+    try {
+      await _libraryStore.addBook(book);
+      await _reloadLibrary();
+    } on Exception catch (error) {
+      if (mounted) _showMessage('Buku gagal disimpan: $error');
+    }
   }
 
   Future<void> _editBook(Book existing) async {
@@ -1065,32 +1192,33 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     final updated = await _showBookForm(context, existing: existing);
     if (!mounted || updated == null) return;
-    setState(() {
-      final index = _books.indexWhere((book) => book.id == existing.id);
-      if (index != -1) {
-        _books[index] = Book(
+    try {
+      await _libraryStore.updateBook(
+        Book(
           id: existing.id,
           title: updated.title,
           author: updated.author,
           category: updated.category,
-          copies: updated.copies < _activeLoansForBook(existing.id)
-              ? _activeLoansForBook(existing.id)
-              : updated.copies,
-        );
-      }
-    });
+          copies: updated.copies,
+        ),
+      );
+      await _reloadLibrary();
+    } on Exception catch (error) {
+      if (mounted) _showMessage('Buku gagal diperbarui: $error');
+    }
   }
 
-  void _deleteBook(Book book) {
+  Future<void> _deleteBook(Book book) async {
     if (!_isAdmin) {
       _showMessage('Hanya Admin yang dapat mengelola buku.');
       return;
     }
-    if (_activeLoansForBook(book.id) > 0) {
-      _showMessage('Buku yang masih dipinjam tidak dapat dihapus.');
-      return;
+    try {
+      await _libraryStore.deleteBook(book.id);
+      await _reloadLibrary();
+    } on Exception catch (error) {
+      if (mounted) _showMessage('Buku gagal dihapus: $error');
     }
-    setState(() => _books.removeWhere((item) => item.id == book.id));
   }
 
   Future<void> _addMember() async {
@@ -1100,16 +1228,12 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     final member = await _showMemberForm(context);
     if (!mounted || member == null) return;
-    setState(() {
-      _members.add(
-        Member(
-          id: _nextMemberId++,
-          name: member.name,
-          phone: member.phone,
-          email: member.email,
-        ),
-      );
-    });
+    try {
+      await _libraryStore.addMember(member);
+      await _reloadLibrary();
+    } on Exception catch (error) {
+      if (mounted) _showMessage('Anggota gagal disimpan: $error');
+    }
   }
 
   Future<void> _editMember(Member existing) async {
@@ -1119,20 +1243,22 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     final updated = await _showMemberForm(context, existing: existing);
     if (!mounted || updated == null) return;
-    setState(() {
-      final index = _members.indexWhere((member) => member.id == existing.id);
-      if (index != -1) {
-        _members[index] = Member(
+    try {
+      await _libraryStore.updateMember(
+        Member(
           id: existing.id,
           name: updated.name,
           phone: updated.phone,
           email: updated.email,
-        );
-      }
-    });
+        ),
+      );
+      await _reloadLibrary();
+    } on Exception catch (error) {
+      if (mounted) _showMessage('Anggota gagal diperbarui: $error');
+    }
   }
 
-  void _deleteMember(Member member) async {
+  Future<void> _deleteMember(Member member) async {
     if (!_isAdmin) {
       _showMessage('Hanya Admin yang dapat mengelola anggota.');
       return;
@@ -1144,14 +1270,14 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
     if (!mounted) return;
-    final hasActiveLoan = _loans.any(
-      (loan) => loan.memberId == member.id && loan.returnedAt == null,
-    );
-    if (hasActiveLoan) {
-      _showMessage('Anggota yang masih memiliki pinjaman tidak dapat dihapus.');
-      return;
+    try {
+      await _libraryStore.deleteMember(member.id);
+      await _reloadLibrary();
+    } on Exception catch (error) {
+      if (mounted) {
+        _showMessage('Anggota gagal dihapus: $error');
+      }
     }
-    setState(() => _members.removeWhere((item) => item.id == member.id));
   }
 
   @override
@@ -2561,11 +2687,29 @@ Future<Loan?> _showLoanForm(
   BuildContext context,
   List<Book> books,
   List<Member> members,
+  int Function(Book) availableCopies,
 ) async {
   final formKey = GlobalKey<FormState>();
-  int? selectedBookId = books.first.id;
   int? selectedMemberId = members.first.id;
-  final dueAt = DateTime.now().add(const Duration(days: 7));
+  int? selectedBookId = books.first.id;
+  var quantity = 1;
+  final now = DateTime.now();
+  var borrowedAt = DateTime(now.year, now.month, now.day);
+  var dueAt = borrowedAt.add(const Duration(days: 7));
+
+  Future<void> selectDate({
+    required DateTime initialDate,
+    required ValueChanged<DateTime> onSelected,
+  }) async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (selected != null) onSelected(selected);
+  }
+
   return showDialog<Loan>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
@@ -2577,24 +2721,6 @@ Future<Loan?> _showLoanForm(
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<int>(
-                initialValue: selectedBookId,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Buku'),
-                items: books
-                    .map(
-                      (book) => DropdownMenuItem(
-                        value: book.id,
-                        child: Text(
-                          book.title,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) =>
-                    setDialogState(() => selectedBookId = value),
-              ),
-              DropdownButtonFormField<int>(
                 initialValue: selectedMemberId,
                 decoration: const InputDecoration(labelText: 'Anggota'),
                 items: members
@@ -2602,7 +2728,7 @@ Future<Loan?> _showLoanForm(
                       (member) => DropdownMenuItem(
                         value: member.id,
                         child: Text(
-                          member.name,
+                          '${member.name} (ID ${member.id})',
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -2611,10 +2737,72 @@ Future<Loan?> _showLoanForm(
                 onChanged: (value) =>
                     setDialogState(() => selectedMemberId = value),
               ),
+              DropdownButtonFormField<int>(
+                initialValue: selectedBookId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Buku'),
+                items: books
+                    .map(
+                      (book) => DropdownMenuItem(
+                        value: book.id,
+                        child: Text(
+                          '${book.title} • Tersedia ${availableCopies(book)}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    setDialogState(() => selectedBookId = value),
+              ),
+              TextFormField(
+                initialValue: '1',
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Jumlah eksemplar',
+                ),
+                validator: (value) {
+                  final parsed = int.tryParse(value ?? '');
+                  if (parsed == null || parsed < 1) {
+                    return 'Masukkan jumlah minimal 1.';
+                  }
+                  final book = books.firstWhere(
+                    (item) => item.id == selectedBookId,
+                  );
+                  if (parsed > availableCopies(book)) {
+                    return 'Stok buku tidak tersedia atau tidak mencukupi.';
+                  }
+                  return null;
+                },
+                onChanged: (value) {
+                  quantity = int.tryParse(value) ?? 0;
+                },
+              ),
               const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Batas pengembalian: ${_formatDate(dueAt)}'),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => selectDate(
+                        initialDate: borrowedAt,
+                        onSelected: (date) =>
+                            setDialogState(() => borrowedAt = date),
+                      ),
+                      child: Text('Tanggal pinjam\n${_formatDate(borrowedAt)}'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => selectDate(
+                        initialDate: dueAt,
+                        onSelected: (date) =>
+                            setDialogState(() => dueAt = date),
+                      ),
+                      child: Text('Batas kembali\n${_formatDate(dueAt)}'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -2628,7 +2816,17 @@ Future<Loan?> _showLoanForm(
             onPressed: () {
               if (!formKey.currentState!.validate() ||
                   selectedBookId == null ||
-                  selectedMemberId == null) {
+                  selectedMemberId == null ||
+                  !dueAt.isAfter(borrowedAt)) {
+                if (!dueAt.isAfter(borrowedAt)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Batas pengembalian harus setelah tanggal pinjam.',
+                      ),
+                    ),
+                  );
+                }
                 return;
               }
               final book = books.firstWhere(
@@ -2645,8 +2843,9 @@ Future<Loan?> _showLoanForm(
                   memberId: member.id,
                   bookTitle: book.title,
                   memberName: member.name,
-                  borrowedAt: DateTime.now(),
+                  borrowedAt: borrowedAt,
                   dueAt: dueAt,
+                  quantity: quantity,
                 ),
               );
             },

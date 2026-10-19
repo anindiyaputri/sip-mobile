@@ -13,10 +13,14 @@ class LoanReportsPage extends StatefulWidget {
     super.key,
     required this.session,
     required this.loans,
+    this.books = const [],
+    this.members = const [],
   });
 
   final AuthenticatedSession session;
   final List<Loan> loans;
+  final List<Book> books;
+  final List<Member> members;
 
   @override
   State<LoanReportsPage> createState() => _LoanReportsPageState();
@@ -26,6 +30,7 @@ class _LoanReportsPageState extends State<LoanReportsPage> {
   final _pdfService = LoanReportPdfService();
   LoanReportPeriod _period = LoanReportPeriod.daily;
   LoanReportStatus _status = LoanReportStatus.all;
+  LoanReportEvent _event = LoanReportEvent.all;
   DateTime _selectedDate = DateTime.now();
   bool _isExporting = false;
 
@@ -132,6 +137,8 @@ class _LoanReportsPageState extends State<LoanReportsPage> {
       final bytes = await _pdfService.createPdf(
         report,
         session: widget.session,
+        books: widget.books,
+        members: widget.members,
       );
       final filename = _fileName(report);
       if (share) {
@@ -165,6 +172,7 @@ class _LoanReportsPageState extends State<LoanReportsPage> {
     period: _period,
     selectedDate: _selectedDate,
     status: _status,
+    event: _event,
   );
 
   String _fileName(LoanReportSnapshot report) {
@@ -223,6 +231,27 @@ class _LoanReportsPageState extends State<LoanReportsPage> {
                     selected: {_period},
                     onSelectionChanged: (selection) {
                       setState(() => _period = selection.first);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<LoanReportEvent>(
+                    segments: const [
+                      ButtonSegment(
+                        value: LoanReportEvent.all,
+                        label: Text('Semua'),
+                      ),
+                      ButtonSegment(
+                        value: LoanReportEvent.borrowed,
+                        label: Text('Peminjaman'),
+                      ),
+                      ButtonSegment(
+                        value: LoanReportEvent.returned,
+                        label: Text('Pengembalian'),
+                      ),
+                    ],
+                    selected: {_event},
+                    onSelectionChanged: (selection) {
+                      setState(() => _event = selection.first);
                     },
                   ),
                   const SizedBox(height: 12),
@@ -382,6 +411,51 @@ class _LoanReportsPageState extends State<LoanReportsPage> {
           else
             ...report.loans.map(
               (loan) => _transactionCard(context, report, loan),
+            ),
+          const SizedBox(height: 16),
+          const Text(
+            'Rekap Data Buku',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          if (widget.books.isEmpty)
+            const Card(child: ListTile(title: Text('Belum ada data buku.')))
+          else
+            ...widget.books.map((book) {
+              final borrowed = widget.loans
+                  .where(
+                    (loan) => loan.bookId == book.id && loan.returnedAt == null,
+                  )
+                  .fold(0, (total, loan) => total + loan.quantity);
+              return Card(
+                child: ListTile(
+                  title: Text(book.title),
+                  subtitle: Text(
+                    '${book.author} • ${book.category}\n'
+                    'Tersedia ${book.copies - borrowed} dari ${book.copies}',
+                  ),
+                  isThreeLine: true,
+                ),
+              );
+            }),
+          const SizedBox(height: 12),
+          const Text(
+            'Rekap Data Anggota',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          if (widget.members.isEmpty)
+            const Card(child: ListTile(title: Text('Belum ada data anggota.')))
+          else
+            ...widget.members.map(
+              (member) => Card(
+                child: ListTile(
+                  title: Text(member.name),
+                  subtitle: Text(
+                    'ID Anggota ${member.id} • ${member.email} • ${member.phone}',
+                  ),
+                ),
+              ),
             ),
           const SizedBox(height: 12),
           Row(

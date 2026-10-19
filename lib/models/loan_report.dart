@@ -4,12 +4,15 @@ enum LoanReportPeriod { daily, monthly }
 
 enum LoanReportStatus { all, borrowed, returned, overdue }
 
+enum LoanReportEvent { all, borrowed, returned }
+
 class LoanReportSnapshot {
   LoanReportSnapshot({
     required List<Loan> loans,
     required this.period,
     required this.selectedDate,
     required this.status,
+    this.event = LoanReportEvent.all,
     DateTime? asOf,
   }) : _loans = List<Loan>.unmodifiable(loans),
        asOf = asOf ?? DateTime.now();
@@ -18,7 +21,10 @@ class LoanReportSnapshot {
   final LoanReportPeriod period;
   final DateTime selectedDate;
   final LoanReportStatus status;
+  final LoanReportEvent event;
   final DateTime asOf;
+
+  List<Loan> get allLoans => _loans;
 
   DateTime get periodStart => period == LoanReportPeriod.daily
       ? _dayStart(selectedDate)
@@ -77,9 +83,14 @@ class LoanReportSnapshot {
         : LoanReportStatus.borrowed;
   }
 
-  bool _isInPeriod(Loan loan) =>
+  bool _isInPeriod(Loan loan) => switch (event) {
+    LoanReportEvent.all =>
       _isWithin(loan.borrowedAt) ||
-      (loan.returnedAt != null && _isWithin(loan.returnedAt!));
+          (loan.returnedAt != null && _isWithin(loan.returnedAt!)),
+    LoanReportEvent.borrowed => _isWithin(loan.borrowedAt),
+    LoanReportEvent.returned =>
+      loan.returnedAt != null && _isWithin(loan.returnedAt!),
+  };
 
   bool _isWithin(DateTime date) {
     final value = _dayStart(date);

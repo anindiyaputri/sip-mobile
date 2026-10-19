@@ -11,6 +11,8 @@ class LoanReportPdfService {
   Future<Uint8List> createPdf(
     LoanReportSnapshot report, {
     required AuthenticatedSession session,
+    List<Book> books = const [],
+    List<Member> members = const [],
   }) async {
     if (session.role != UserRole.admin) {
       throw StateError('Laporan hanya dapat dibuat oleh Admin.');
@@ -34,6 +36,28 @@ class LoanReportPdfService {
         'Status',
       ],
       ...report.loans.map((loan) => _loanRow(loan, report)),
+    ];
+    final bookRows = <List<String>>[
+      ['ID', 'Judul', 'Pengarang', 'Kategori', 'Tersedia', 'Jumlah'],
+      ...books.map((book) {
+        final activeCopies = report.allLoans
+            .where((loan) => loan.bookId == book.id && loan.returnedAt == null)
+            .fold(0, (total, loan) => total + loan.quantity);
+        return [
+          '${book.id}',
+          book.title,
+          book.author,
+          book.category,
+          '${book.copies - activeCopies}',
+          '${book.copies}',
+        ];
+      }),
+    ];
+    final memberRows = <List<String>>[
+      ['ID', 'Nama', 'Email', 'Telepon'],
+      ...members.map(
+        (member) => ['${member.id}', member.name, member.email, member.phone],
+      ),
     ];
 
     document.addPage(
@@ -67,6 +91,7 @@ class LoanReportPdfService {
           ),
           pw.SizedBox(height: 6),
           pw.Text('Jenis: $reportName  |  Periode: $periodLabel'),
+          pw.Text('Jenis transaksi: ${_eventLabel(report.event)}'),
           pw.Text('Filter status: ${_statusLabel(report.status)}'),
           pw.Text('Tanggal dibuat: ${_formatDate(DateTime.now())}'),
           pw.SizedBox(height: 14),
@@ -123,6 +148,48 @@ class LoanReportPdfService {
             pw.SizedBox(height: 8),
             pw.Text('Tidak ada transaksi untuk periode dan filter ini.'),
           ],
+          pw.SizedBox(height: 14),
+          pw.Text(
+            'Rekap Data Buku',
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.TableHelper.fromTextArray(
+            data: bookRows,
+            headerCount: 1,
+            cellStyle: const pw.TextStyle(fontSize: 7),
+            headerStyle: pw.TextStyle(
+              fontSize: 7,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.blue700),
+            cellPadding: const pw.EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: 4,
+            ),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            'Rekap Data Anggota',
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.TableHelper.fromTextArray(
+            data: memberRows,
+            headerCount: 1,
+            cellStyle: const pw.TextStyle(fontSize: 7),
+            headerStyle: pw.TextStyle(
+              fontSize: 7,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.blue700),
+            cellPadding: const pw.EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: 4,
+            ),
+          ),
         ],
       ),
     );
@@ -156,6 +223,12 @@ class LoanReportPdfService {
     LoanReportStatus.borrowed => 'Dipinjam',
     LoanReportStatus.returned => 'Dikembalikan',
     LoanReportStatus.overdue => 'Terlambat',
+  };
+
+  String _eventLabel(LoanReportEvent event) => switch (event) {
+    LoanReportEvent.all => 'Peminjaman dan pengembalian',
+    LoanReportEvent.borrowed => 'Peminjaman',
+    LoanReportEvent.returned => 'Pengembalian',
   };
 
   String _formatDate(DateTime date) =>

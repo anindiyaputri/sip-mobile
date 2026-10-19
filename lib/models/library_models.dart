@@ -37,6 +37,7 @@ class Loan {
     required this.memberName,
     required this.borrowedAt,
     required this.dueAt,
+    this.quantity = 1,
     this.returnedAt,
     this.ownerUserId,
   });
@@ -48,8 +49,9 @@ class Loan {
   final String memberName;
   final DateTime borrowedAt;
   final DateTime dueAt;
+  final int quantity;
   final DateTime? returnedAt;
   final String? ownerUserId;
 
-  int get quantity => 1;
+  String get status => returnedAt == null ? 'Dipinjam' : 'Dikembalikan';
 }
