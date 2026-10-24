@@ -502,7 +502,7 @@ void main() {
           title: 'Buku Riwayat Uji',
           author: 'Pengarang Uji',
           category: 'Uji',
-          copies: 2,
+          copies: 4,
         ),
       ],
       initialMembers: const [
@@ -550,6 +550,24 @@ void main() {
       expect(find.text('Transaksi'), findsNothing);
       expect(find.text('Laporan'), findsNothing);
       expect(find.text('Tambah Buku'), findsNothing);
+
+      await tester.tap(find.text('Buku').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Pinjam Buku'), findsOneWidget);
+      await tester.tap(find.text('Pinjam Buku'));
+      await tester.pumpAndSettle();
+      expect(find.text('Konfirmasi peminjaman'), findsOneWidget);
+      expect(find.textContaining('Stok tersedia:'), findsOneWidget);
+      await tester.tap(find.text('Pinjam').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Buku Riwayat Uji berhasil dipinjam.'), findsOneWidget);
+      final updatedLibrary = await libraryStore.load();
+      expect(
+        updatedLibrary.loans.where(
+          (loan) => loan.ownerUserId == session.userId,
+        ),
+        hasLength(2),
+      );
 
       await tester.tap(find.text('Riwayat'));
       await tester.pumpAndSettle();

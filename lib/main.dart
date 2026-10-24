@@ -898,6 +898,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   bool get _isAdmin => _session.role == UserRole.admin;
+  bool get _canBorrow =>
+      _session.role == UserRole.guru || _session.role == UserRole.siswa;
 
   Future<void> _loadLibrary() async {
     try {
@@ -960,12 +962,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   List<Loan> get _visibleLoans {
     if (_isAdmin) return _loans;
-    return _loans.where((loan) {
-      if (loan.ownerUserId != null) {
-        return loan.ownerUserId == _session.userId;
-      }
-      return _session.memberId != null && loan.memberId == _session.memberId;
-    }).toList();
+    return _loans.where((loan) => loan.ownerUserId == _session.userId).toList();
   }
 
   int _activeLoansForBook(int bookId) => _loans
@@ -974,10 +971,113 @@ class _DashboardPageState extends State<DashboardPage> {
 
   int _availableCopies(Book book) => book.copies - _activeLoansForBook(book.id);
 
+  Future<int> _borrowerMemberId() async {
+    final linkedMemberId = _session.memberId;
+    if (linkedMemberId != null) {
+      if (!_members.any((member) => member.id == linkedMemberId)) {
+        throw StateError(
+          'Data anggota akun tidak ditemukan. Hubungi Admin untuk memperbarui tautan akun.',
+        );
+      }
+      return linkedMemberId;
+    }
+
+    final matchingMember = _members.where(
+      (member) => member.email.toLowerCase() == _session.login.toLowerCase(),
+    );
+    if (matchingMember.isNotEmpty) {
+      final member = matchingMember.first;
+      final linkedUserId = await _accountStore.userIdForMember(member.id);
+      if (linkedUserId != null && linkedUserId != _session.userId) {
+        throw StateError(
+          'Email akun sudah tertaut ke anggota lain. Hubungi Admin untuk memperbarui tautan akun.',
+        );
+      }
+      return member.id;
+    }
+
+    final member = await _libraryStore.addMember(
+      Member(
+        id: 0,
+        name: _userProfile.name?.trim().isNotEmpty == true
+            ? _userProfile.name!.trim()
+            : _session.login,
+        phone: _userProfile.phone ?? '',
+        email: _session.login,
+      ),
+    );
+    await _reloadLibrary();
+    return member.id;
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _borrowBook(Book book) async {
+    if (!_canBorrow) {
+      _showMessage('Hanya Guru dan Siswa yang dapat meminjam buku.');
+      return;
+    }
+    if (_isSavingTransaction) return;
+
+    setState(() => _isSavingTransaction = true);
+    try {
+      final availableCopies = _availableCopies(book);
+      final borrowedAt = DateTime.now();
+      final dueAt = borrowedAt.add(const Duration(days: 7));
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(
+            availableCopies > 0
+                ? 'Konfirmasi peminjaman'
+                : 'Buku tidak tersedia',
+          ),
+          content: Text(
+            'Judul: ${book.title}\n'
+            'Stok tersedia: $availableCopies dari ${book.copies}'
+            '${availableCopies > 0 ? '\nBatas pengembalian: ${_formatDate(dueAt)}' : '\nPeminjaman tidak dapat dilakukan karena stok habis.'}',
+          ),
+          actions: availableCopies > 0
+              ? [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('Batal'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: const Text('Pinjam'),
+                  ),
+                ]
+              : [
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('Tutup'),
+                  ),
+                ],
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+
+      final memberId = await _borrowerMemberId();
+      await _libraryStore.createLoan(
+        memberId: memberId,
+        bookId: book.id,
+        borrowedAt: borrowedAt,
+        dueAt: dueAt,
+        quantity: 1,
+        ownerUserId: _session.userId,
+      );
+      await _reloadLibrary();
+      if (mounted) _showMessage('${book.title} berhasil dipinjam.');
+    } on Exception catch (error) {
+      if (mounted) _showMessage('Peminjaman gagal: $error');
+    } finally {
+      if (mounted) setState(() => _isSavingTransaction = false);
+    }
   }
 
   void _addLoan() async {
@@ -1077,6 +1177,8 @@ class _DashboardPageState extends State<DashboardPage> {
             books: _books,
             availableCopies: _availableCopies,
             searchQuery: _bookSearch,
+            onBorrow: _canBorrow ? _borrowBook : null,
+            isSavingTransaction: _isSavingTransaction,
             onAdd: _addBook,
             onEdit: _editBook,
             onDelete: _deleteBook,
@@ -1120,6 +1222,8 @@ class _DashboardPageState extends State<DashboardPage> {
             books: _books,
             availableCopies: _availableCopies,
             searchQuery: _bookSearch,
+            onBorrow: _canBorrow ? _borrowBook : null,
+            isSavingTransaction: _isSavingTransaction,
           );
         case 2:
           return LoansPage(
@@ -1943,6 +2047,8 @@ class BooksPage extends StatelessWidget {
     required this.books,
     required this.availableCopies,
     required this.searchQuery,
+    this.onBorrow,
+    this.isSavingTransaction = false,
     this.onAdd,
     this.onEdit,
     this.onDelete,
@@ -1952,6 +2058,8 @@ class BooksPage extends StatelessWidget {
   final List<Book> books;
   final int Function(Book) availableCopies;
   final String searchQuery;
+  final ValueChanged<Book>? onBorrow;
+  final bool isSavingTransaction;
   final VoidCallback? onAdd;
   final ValueChanged<Book>? onEdit;
   final ValueChanged<Book>? onDelete;
@@ -1988,104 +2096,140 @@ class BooksPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                     side: const BorderSide(color: Color(0xFFE8EDF5)),
                   ),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () =>
-                        _showBookDetails(context, book, availableCopies(book)),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(11, 10, 5, 10),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CircleAvatar(
-                            radius: 19,
-                            backgroundColor: Theme.of(context)
-                                .colorScheme
-                                .primaryContainer,
-                            child: Icon(
-                              Icons.menu_book_rounded,
-                              size: 21,
-                              color: Theme.of(context).colorScheme.primary,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => _showBookDetails(
+                            context,
+                            book,
+                            availableCopies(book),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                  radius: 19,
+                                  backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer,
+                                  child: Icon(
+                                    Icons.menu_book_rounded,
+                                    size: 21,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 1),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          book.title,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            height: 1.2,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          book.author,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 12.5,
+                                            height: 1.25,
+                                            color: Color(0xFF647087),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          book.category,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            height: 1.25,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          'Tersedia ${availableCopies(book)} dari ${book.copies}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            height: 1.25,
+                                            color: Color(0xFF667085),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (session.role == UserRole.admin)
+                                  PopupMenuButton<String>(
+                                    padding: EdgeInsets.zero,
+                                    tooltip: 'Tindakan buku',
+                                    onSelected: (action) {
+                                      if (action == 'edit') {
+                                        onEdit?.call(book);
+                                      }
+                                      if (action == 'delete') {
+                                        onDelete?.call(book);
+                                      }
+                                    },
+                                    itemBuilder: (context) => const [
+                                      PopupMenuItem(
+                                        value: 'edit',
+                                        child: Text('Edit'),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text('Hapus'),
+                                      ),
+                                    ],
+                                  ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 1),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    book.title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      height: 1.2,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    book.author,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 12.5,
-                                      height: 1.25,
-                                      color: Color(0xFF647087),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    book.category,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      height: 1.25,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    'Tersedia ${availableCopies(book)} dari ${book.copies}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      height: 1.25,
-                                      color: Color(0xFF667085),
-                                    ),
-                                  ),
-                                ],
+                        ),
+                        if (onBorrow != null)
+                          FilledButton.icon(
+                            onPressed: isSavingTransaction
+                                ? null
+                                : () => onBorrow!(book),
+                            icon: const Icon(Icons.bookmark_add_outlined),
+                            label: Text(
+                              isSavingTransaction
+                                  ? 'Memproses peminjaman...'
+                                  : 'Pinjam Buku',
+                            ),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(44),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                           ),
-                          if (session.role == UserRole.admin)
-                            PopupMenuButton<String>(
-                              padding: EdgeInsets.zero,
-                              tooltip: 'Tindakan buku',
-                              onSelected: (action) {
-                                if (action == 'edit') onEdit?.call(book);
-                                if (action == 'delete') onDelete?.call(book);
-                              },
-                              itemBuilder: (context) => const [
-                                PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Edit'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text('Hapus'),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
                 );
@@ -2307,15 +2451,7 @@ class LoansPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibleLoans = session.role == UserRole.admin
         ? loans
-        : loans
-              .where(
-                (loan) =>
-                    loan.ownerUserId == session.userId ||
-                    (loan.ownerUserId == null &&
-                        session.memberId != null &&
-                        loan.memberId == session.memberId),
-              )
-              .toList();
+        : loans.where((loan) => loan.ownerUserId == session.userId).toList();
     final isAdmin = session.role == UserRole.admin;
     final activeLoans = visibleLoans
         .where((loan) => loan.returnedAt == null)
