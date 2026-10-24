@@ -85,10 +85,19 @@ void main() {
     expect(persisted.loans.single.id, loan.id);
     expect(persisted.loans.single.status, 'Dipinjam');
     expect(persisted.loans.single.quantity, 1);
+    await expectLater(
+      openAgain.returnLoan(
+        loan.id,
+        DateTime(2026, 10, 20),
+        ownerUserId: 'user-siswa',
+      ),
+      throwsStateError,
+    );
 
     final returned = await openAgain.returnLoan(
       loan.id,
       DateTime(2026, 10, 20),
+      ownerUserId: 'user-guru',
     );
     expect(returned.status, 'Dikembalikan');
     expect(returned.returnedAt, DateTime(2026, 10, 20));
@@ -100,7 +109,28 @@ void main() {
     expect(finalSnapshot.loans, hasLength(1));
     expect(finalSnapshot.loans.single.returnedAt, DateTime(2026, 10, 20));
     expect(finalSnapshot.books.single.copies, 1);
+    expect(finalSnapshot.loans.single.ownerUserId, 'user-guru');
     await openAgain.close();
+    final reopenedAfterReturn = LibraryLocalStore(
+      databasePath:
+          '${temporaryDirectory.path}${Platform.pathSeparator}library.db',
+      factory: databaseFactoryFfi,
+    );
+    final persistedReturn = await reopenedAfterReturn.load();
+    expect(persistedReturn.loans.single.status, 'Dikembalikan');
+    expect(persistedReturn.loans.single.returnedAt, DateTime(2026, 10, 20));
+    expect(
+      persistedReturn.books.single.copies -
+          persistedReturn.loans
+              .where(
+                (loan) =>
+                    loan.bookId == persistedReturn.books.single.id &&
+                    loan.returnedAt == null,
+              )
+              .fold(0, (total, loan) => total + loan.quantity),
+      1,
+    );
+    await reopenedAfterReturn.close();
   });
 
   test('zero stock and invalid references are rejected', () async {
@@ -127,6 +157,82 @@ void main() {
         ownerUserId: null,
       ),
       throwsStateError,
+    );
+  });
+
+  test('Guru and Siswa can return only their own loans once', () async {
+    await initialize(copies: 2);
+    final snapshot = await store.load();
+    final guruLoan = await store.createLoan(
+      memberId: snapshot.members.single.id,
+      bookId: snapshot.books.single.id,
+      borrowedAt: DateTime(2026, 10, 19),
+      dueAt: DateTime(2026, 10, 26),
+      quantity: 1,
+      ownerUserId: 'guru-account-id',
+    );
+    final siswaLoan = await store.createLoan(
+      memberId: snapshot.members.single.id,
+      bookId: snapshot.books.single.id,
+      borrowedAt: DateTime(2026, 10, 19),
+      dueAt: DateTime(2026, 10, 26),
+      quantity: 1,
+      ownerUserId: 'siswa-account-id',
+    );
+
+    expect(
+      snapshot.books.single.copies -
+          (await store.load()).loans.fold(
+            0,
+            (total, loan) => total + loan.quantity,
+          ),
+      0,
+    );
+    await expectLater(
+      store.returnLoan(
+        guruLoan.id,
+        DateTime(2026, 10, 20),
+        ownerUserId: 'siswa-account-id',
+      ),
+      throwsStateError,
+    );
+
+    final returnedByGuru = await store.returnLoan(
+      guruLoan.id,
+      DateTime(2026, 10, 20),
+      ownerUserId: 'guru-account-id',
+    );
+    expect(returnedByGuru.status, 'Dikembalikan');
+    expect(returnedByGuru.returnedAt, DateTime(2026, 10, 20));
+    await expectLater(
+      store.returnLoan(
+        guruLoan.id,
+        DateTime(2026, 10, 21),
+        ownerUserId: 'guru-account-id',
+      ),
+      throwsStateError,
+    );
+    expect(
+      snapshot.books.single.copies -
+          (await store.load()).loans
+              .where((loan) => loan.returnedAt == null)
+              .fold(0, (total, loan) => total + loan.quantity),
+      1,
+    );
+
+    final returnedBySiswa = await store.returnLoan(
+      siswaLoan.id,
+      DateTime(2026, 10, 21),
+      ownerUserId: 'siswa-account-id',
+    );
+    expect(returnedBySiswa.status, 'Dikembalikan');
+    expect(returnedBySiswa.returnedAt, DateTime(2026, 10, 21));
+    expect(
+      snapshot.books.single.copies -
+          (await store.load()).loans
+              .where((loan) => loan.returnedAt == null)
+              .fold(0, (total, loan) => total + loan.quantity),
+      2,
     );
   });
 

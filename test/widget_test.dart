@@ -579,8 +579,45 @@ void main() {
         expect(find.text('Siti Rahma'), findsOneWidget);
         expect(find.text('Andi Saputra'), findsNothing);
       }
-      expect(find.byTooltip('Proses pengembalian'), findsNothing);
+      expect(find.text('Kembalikan Buku'), findsNWidgets(2));
       expect(find.byType(FloatingActionButton), findsNothing);
+
+      await tester.tap(find.text('Kembalikan Buku').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Konfirmasi pengembalian'), findsOneWidget);
+      expect(find.textContaining('Buku Riwayat Uji'), findsOneWidget);
+      await tester.tap(find.text('Batal'));
+      await tester.pumpAndSettle();
+      expect(
+        (await libraryStore.load()).loans
+            .where(
+              (loan) =>
+                  loan.ownerUserId == session.userId && loan.returnedAt != null,
+            )
+            .length,
+        0,
+      );
+
+      await tester.tap(find.text('Kembalikan Buku').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Konfirmasi'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Buku Riwayat Uji berhasil dikembalikan.'),
+        findsOneWidget,
+      );
+      final afterReturn = await libraryStore.load();
+      final returnedLoan = afterReturn.loans.firstWhere(
+        (loan) => loan.ownerUserId == session.userId && loan.returnedAt != null,
+      );
+      expect(returnedLoan.status, 'Dikembalikan');
+      expect(returnedLoan.returnedAt, isNotNull);
+      expect(find.text('Kembalikan Buku'), findsOneWidget);
+      await tester.tap(find.text('Buku').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Tersedia 2 dari 4'), findsOneWidget);
+      await tester.tap(find.text('Riwayat').last);
+      await tester.pumpAndSettle();
 
       final ownLoan = Loan(
         id: 11,

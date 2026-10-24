@@ -1124,8 +1124,16 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _returnLoan(Loan loan) async {
-    if (!_isAdmin) {
-      _showMessage('Hanya Admin yang dapat memproses pengembalian.');
+    if (!_isAdmin && !_canBorrow) {
+      _showMessage('Akun ini tidak memiliki akses untuk mengembalikan buku.');
+      return;
+    }
+    if (!_isAdmin && loan.ownerUserId != _session.userId) {
+      _showMessage('Anda hanya dapat mengembalikan buku milik akun Anda.');
+      return;
+    }
+    if (loan.returnedAt != null) {
+      _showMessage('Buku ini sudah dikembalikan.');
       return;
     }
     if (_isSavingTransaction) return;
@@ -1133,13 +1141,7 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Konfirmasi pengembalian'),
-        content: Text(
-          '${loan.bookTitle}\n'
-          'Anggota: ${loan.memberName}\n'
-          'Jumlah: ${loan.quantity}\n'
-          'Tanggal pinjam: ${_formatDate(loan.borrowedAt)}\n'
-          'Batas pengembalian: ${_formatDate(loan.dueAt)}',
-        ),
+        content: Text('Kembalikan buku "${loan.bookTitle}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -1155,7 +1157,11 @@ class _DashboardPageState extends State<DashboardPage> {
     if (!mounted || confirmed != true) return;
     setState(() => _isSavingTransaction = true);
     try {
-      await _libraryStore.returnLoan(loan.id, DateTime.now());
+      await _libraryStore.returnLoan(
+        loan.id,
+        DateTime.now(),
+        ownerUserId: _isAdmin ? null : _session.userId,
+      );
       await _reloadLibrary();
       if (mounted) _showMessage('${loan.bookTitle} berhasil dikembalikan.');
     } on Exception catch (error) {
@@ -1197,6 +1203,7 @@ class _DashboardPageState extends State<DashboardPage> {
             loans: _visibleLoans,
             onAdd: _addLoan,
             onReturn: _returnLoan,
+            isSavingTransaction: _isSavingTransaction,
           );
         case 4:
           return LoanReportsPage(
@@ -1231,6 +1238,7 @@ class _DashboardPageState extends State<DashboardPage> {
             loans: _visibleLoans,
             onAdd: _addLoan,
             onReturn: _returnLoan,
+            isSavingTransaction: _isSavingTransaction,
           );
         case 3:
           return _buildProfilePage();
@@ -2440,12 +2448,14 @@ class LoansPage extends StatelessWidget {
     required this.loans,
     required this.onAdd,
     required this.onReturn,
+    this.isSavingTransaction = false,
   });
 
   final AuthenticatedSession session;
   final List<Loan> loans;
   final VoidCallback onAdd;
   final ValueChanged<Loan> onReturn;
+  final bool isSavingTransaction;
 
   @override
   Widget build(BuildContext context) {
@@ -2486,7 +2496,12 @@ class LoansPage extends StatelessWidget {
             )
           else
             ...activeLoans.map(
-              (loan) => _loanCard(context, loan, isReturned: false),
+              (loan) => _loanCard(
+                context,
+                loan,
+                isReturned: false,
+                isSavingTransaction: isSavingTransaction,
+              ),
             ),
           const SizedBox(height: 24),
           Text(
@@ -2518,6 +2533,7 @@ class LoansPage extends StatelessWidget {
     BuildContext context,
     Loan loan, {
     required bool isReturned,
+    bool isSavingTransaction = false,
   }) {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
@@ -2619,7 +2635,25 @@ class LoansPage extends StatelessWidget {
                   Icons.assignment_turned_in_outlined,
                   color: Color(0xFF3157D5),
                 ),
-                onPressed: () => onReturn(loan),
+                onPressed: isSavingTransaction ? null : () => onReturn(loan),
+              )
+            else if (!isReturned &&
+                (session.role == UserRole.guru ||
+                    session.role == UserRole.siswa))
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: FilledButton.tonal(
+                  onPressed: isSavingTransaction ? null : () => onReturn(loan),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(48, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                  ),
+                  child: const Text(
+                    'Kembalikan Buku',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, height: 1.1),
+                  ),
+                ),
               ),
           ],
         ),

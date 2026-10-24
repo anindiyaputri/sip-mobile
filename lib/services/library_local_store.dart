@@ -316,7 +316,11 @@ class LibraryLocalStore {
     });
   }
 
-  Future<Loan> returnLoan(int loanId, DateTime returnedAt) async {
+  Future<Loan> returnLoan(
+    int loanId,
+    DateTime returnedAt, {
+    String? ownerUserId,
+  }) async {
     final database = await _database;
     return database.transaction((transaction) async {
       final rows = await transaction.query(
@@ -327,6 +331,9 @@ class LibraryLocalStore {
       );
       if (rows.isEmpty) throw StateError('Transaksi tidak ditemukan.');
       final current = rows.single;
+      if (ownerUserId != null && current['owner_user_id'] != ownerUserId) {
+        throw StateError('Transaksi ini bukan milik akun Anda.');
+      }
       if (current['status'] != 'Dipinjam' || current['returned_at'] != null) {
         throw StateError('Transaksi ini sudah dikembalikan.');
       }
